@@ -1,0 +1,13 @@
+# Render.com blueprint — deploy the full multiplayer server.
+# Push this repo to GitHub, then in Render: New + → Blueprint → pick the repo.
+services:
+  - type: web
+    name: immune-response
+    runtime: node
+    plan: free
+    buildCommand: ""          # zero dependencies — nothing to install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT             # Render injects this; server.js already honors it
+        sync: false
