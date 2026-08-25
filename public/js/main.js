@@ -110,6 +110,11 @@ function render(view,dtReal){
   ctx.fillStyle='#05080f';           // letterbox bars match the void
   ctx.fillRect(0,0,W,H);
   ctx.save();
+  // hard-clip everything to the world rectangle: entities beyond the arena
+  // (spawns walking in, knockback drift) can never smear into the bars
+  ctx.beginPath();
+  ctx.rect(vOffX,vOffY,VW*vScale,VH*vScale);
+  ctx.clip();
   ctx.translate(vOffX,vOffY);
   ctx.scale(vScale,vScale);
   if(FX.shake>0.2&&!REDUCED)ctx.translate(rand(-1,1)*FX.shake*0.4,rand(-1,1)*FX.shake*0.4);
@@ -237,14 +242,14 @@ function wireUi(){
 
   $('btnCopyCode').addEventListener('click',()=>{
     const c=$('lobbyCode').textContent;
-    try{navigator.clipboard.writeText(c).catch(function(){});}catch(_){}
-    toast('Code '+c+' copied');
+    if(copyText(c))toast('Code '+c+' copied');
+    else toast('Copy blocked — select the code text and copy manually',true);
   });
   $('btnCopyLink').addEventListener('click',()=>{
     const c=$('lobbyCode').textContent;
     const url=location.origin+location.pathname+'#join='+c;
-    try{navigator.clipboard.writeText(url).catch(function(){});}catch(_){}
-    toast('Invite link copied');
+    if(copyText(url))toast('Invite link copied — send it to your squad');
+    else toast('Copy blocked — share the code '+c+' instead',true);
   });
   $('btnReady').addEventListener('click',()=>netSend({t:'ready'}));
   $('btnLaunch').addEventListener('click',()=>netSend({t:'startGame'}));
@@ -317,6 +322,17 @@ function wireUi(){
 
   resize();
   showScreen('screenSplash');
+  // Invite links (#join=CODE) skip the menu entirely: land straight on the
+  // connect screen with the code filled in — one name + one tap to join.
+  const invite=/^#join=([A-Z0-9]{4})$/i.exec(location.hash||'');
+  if(invite){
+    App.playerName=App.playerName||'';
+    $('nameInput').value=App.playerName;
+    $('codeInput').value=invite[1].toUpperCase();
+    showScreen('screenConnect');
+    setStatus('Invite loaded — enter your name, then tap Join');
+    $('nameInput').focus();
+  }
   requestAnimationFrame(loop);
 }
 wireUi();

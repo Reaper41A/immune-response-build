@@ -59,12 +59,24 @@ window.addEventListener('orientationchange',()=>setTimeout(resize,80));
 /* World-space helpers — pure functions of the FROZEN virtual size. */
 function worldCore(){return{x:VW*0.5,y:VH*0.52};}
 function coreRadius(){return Math.min(VW,VH)*0.10;}
-function arenaRadius(){return Math.min(VW,VH)*0.62;}
+/* The playable circle must fit ENTIRELY inside the world rectangle (the core
+   sits slightly below center, so the bottom edge is the tight one) — otherwise
+   players get clamped into letterbox dead space where nothing can reach them. */
+function arenaRadius(){
+  return Math.min(VW*0.5,VH*0.52,VH*0.48)*0.92;
+}
+/* Spawn just OUTSIDE the visible world edge (never deep in off-screen space):
+   march a ray from the core until it exits the inflated rect. Enemies walk
+   into view within moments instead of lurking unseen beyond it. */
 function randomSpawnPoint(){
   const c=worldCore();
   const a=rand(0,Math.PI*2);
-  const r=Math.max(VW,VH)*0.72;
-  return{x:c.x+Math.cos(a)*r,y:c.y+Math.sin(a)*r,angle:a};
+  const dx=Math.cos(a),dy=Math.sin(a);
+  const pad=44;
+  const tx=dx>0?(VW-c.x+pad)/dx:(dx<0?(pad-c.x)/dx:Infinity);
+  const ty=dy>0?(VH-c.y+pad)/dy:(dy<0?(pad-c.y)/dy:Infinity);
+  const r=Math.min(tx,ty);
+  return{x:c.x+dx*r,y:c.y+dy*r,angle:a};
 }
 
 /* ---------------------------------------------------------------- app */
@@ -93,4 +105,24 @@ function toast(msg,isError){
   t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2800);
+}
+/* Clipboard that tells the truth: navigator.clipboard only exists in secure
+   contexts (https / localhost) — on a LAN http URL it's absent, so fall back
+   to a hidden textarea and report actual success. */
+function copyText(text){
+  try{
+    if(navigator.clipboard&&window.isSecureContext){
+      navigator.clipboard.writeText(text).catch(()=>{});
+      return true;
+    }
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.focus();ta.select();
+    let ok=false;
+    try{ok=document.execCommand('copy');}catch(_){}
+    ta.remove();
+    return ok;
+  }catch(_){return false;}
 }

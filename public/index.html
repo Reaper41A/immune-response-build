@@ -125,9 +125,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .class-ab b{color:var(--cc);}
 
 /* ---------------------------------------------------------------- lobby */
-.lobby-panel{width:min(94vw,520px);max-width:100%;background:var(--membrane);border:1px solid var(--line);border-radius:20px;padding:20px;animation:popIn .35s ease;}
+.lobby-panel{width:min(94vw,520px);max-width:100%;max-height:calc(100vh - 90px);overflow-y:auto;background:var(--membrane);border:1px solid var(--line);border-radius:20px;padding:20px;animation:popIn .35s ease;}
 .lobby-code-row{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px 10px;margin:6px 0 16px;}
-.lobby-code{font-family:var(--font-mono);font-size:clamp(24px,7vw,38px);font-weight:800;letter-spacing:.28em;color:var(--plasma);text-shadow:0 0 18px rgba(62,232,200,.45);}
+.lobby-code{font-family:var(--font-mono);font-size:clamp(24px,7vw,38px);font-weight:800;letter-spacing:.28em;color:var(--plasma);text-shadow:0 0 18px rgba(62,232,200,.45);user-select:text;-webkit-user-select:text;}
 .copy-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);color:var(--dim);border-radius:8px;padding:7px 10px;font-size:11px;font-family:var(--font-mono);cursor:pointer;white-space:nowrap;}
 .copy-btn:hover{color:var(--tissue);background:rgba(255,255,255,.12);}
 .copy-btn.kick-btn{color:#ff8ea0;border-color:rgba(255,77,109,.35);margin-left:4px;}
@@ -224,11 +224,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   content:attr(data-tip);position:absolute;z-index:60;top:calc(100% + 7px);left:50%;transform:translateX(-50%);
   background:rgba(5,8,15,.95);border:1px solid rgba(255,255,255,.18);color:var(--tissue);
   font-family:var(--font-mono);font-size:10px;line-height:1.5;padding:7px 10px;border-radius:9px;
-  white-space:normal;width:max-content;max-width:230px;text-align:left;pointer-events:none;
+  white-space:normal;width:max-content;max-width:min(230px,64vw);text-align:left;pointer-events:none;
   box-shadow:0 10px 26px rgba(0,0,0,.5);animation:fadeIn .18s ease;
 }
 
-.callout-feed{position:absolute;top:96px;left:14px;z-index:21;display:flex;flex-direction:column-reverse;gap:4px;max-width:min(58vw,300px);}
+.callout-feed{position:absolute;top:118px;left:14px;z-index:21;display:flex;flex-direction:column-reverse;gap:4px;max-width:min(58vw,300px);}
 .callout{
   font-family:var(--font-mono);font-size:11px;padding:6px 11px;border-radius:9px;
   background:rgba(10,18,32,.85);border-left:2px solid var(--plasma);
@@ -455,7 +455,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .stat-box{background:var(--membrane);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;}
 .stat-box .v{font-size:23px;font-weight:800;color:var(--plasma);}
 .stat-box .l{font-family:var(--font-mono);font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.09em;margin-top:3px;}
-.results-reason{font-size:13px;color:var(--dim);margin:-18px 0 22px;font-style:italic;}
+.results-reason{font-size:13px;color:var(--dim);margin:8px 0 22px;font-style:italic;max-width:min(88vw,420px);text-align:center;}
 
 /* -------------------------------------------------------------- toast */
 .toast{
@@ -474,10 +474,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
 }
 @media (max-width:480px){
-  .callout-feed{top:112px;}
-  .boss-bar{top:92px;}
+  .callout-feed{top:148px;}
+  .boss-bar{top:100px;}
   .draft-panel{padding:14px;}
-  .lobby-panel{padding:14px;}
+  .lobby-panel{padding:14px;max-height:calc(100vh - 70px);}
   .slot{flex-wrap:wrap;gap:5px 8px;padding:8px 10px;}
   .class-grid{grid-template-columns:repeat(auto-fit,minmax(136px,1fr));}
 }
@@ -616,6 +616,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <button class="copy-btn" id="btnCopyCode">COPY</button>
         <button class="copy-btn" id="btnCopyLink">COPY LINK</button>
       </div>
+      <div style="font-family:var(--font-mono);font-size:9.5px;color:var(--dim);text-align:center;line-height:1.6;margin:-8px 0 14px;">Friends open this same site → Multiplayer → enter the code.<br>COPY LINK sends them straight to the join screen.</div>
       <div class="slot-list" id="slotList"></div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);letter-spacing:.14em;margin-bottom:8px;">CHOOSE YOUR CELL</div>
       <div class="class-grid" id="lobbyClassGrid" style="margin-bottom:14px;"></div>
