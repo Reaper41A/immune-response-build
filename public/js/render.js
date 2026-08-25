@@ -119,13 +119,15 @@ function drawTrails(view){
 function drawHazards(view){
   const t=performance.now()/1000;
   for(const hz of view.hazards||[]){
+    const R=hz.r||hz.radius||0; // views carry `r` (host + snapshot); SIM carries `radius`
+    if(!(R>0))continue;
     const fade=clamp(hz.l/1.8,0,1);
     ctx.save();
     ctx.globalAlpha=fade*0.4;
-    const g=ctx.createRadialGradient(hz.x,hz.y,0,hz.x,hz.y,hz.radius);
+    const g=ctx.createRadialGradient(hz.x,hz.y,0,hz.x,hz.y,R);
     g.addColorStop(0,'rgba(212,255,77,0.55)');g.addColorStop(1,'rgba(212,255,77,0)');
     ctx.fillStyle=g;
-    ctx.beginPath();ctx.arc(hz.x,hz.y,hz.radius*(0.9+Math.sin(t*3)*0.08),0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(hz.x,hz.y,R*(0.9+Math.sin(t*3)*0.08),0,Math.PI*2);ctx.fill();
     ctx.restore();
   }
 }

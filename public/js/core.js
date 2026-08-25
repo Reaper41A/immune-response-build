@@ -50,7 +50,11 @@ function fitWorld(){
 }
 function initWorld(){
   const ar=clamp(W/Math.max(1,H),0.62,2.2);
-  VH=900;VW=Math.round(clamp(VH*ar,700,1760));
+  // phones get a physically smaller arena so the projection scale (and thus
+  // every entity on screen) stays readable instead of shrinking into the distance
+  const compact=Math.min(W,H)<520;
+  VH=compact?700:900;
+  VW=Math.round(clamp(VH*ar,compact?500:700,1760));
   fitWorld();
 }
 window.addEventListener('resize',resize);

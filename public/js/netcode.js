@@ -12,6 +12,7 @@ function buildSnapshot(){
   const s=SIM;
   return{
     ts:r1(s.time),
+    vw:VW,vh:VH, // guests must project the host's frozen arena, not their own
     phase:s.phase,
     phaseLeft:r1(Math.max(0,s.phaseTimer)),
     phaseDur:s.phaseDur,
@@ -61,6 +62,7 @@ const Guest={
 };
 function guestReset(){Guest.snaps=[];Guest.lastSeq=0;}
 function guestPushSnap(d){
+  if(d.vw&&d.vh&&(d.vw!==VW||d.vh!==VH)){VW=d.vw;VH=d.vh;fitWorld();}
   if(d.evs)for(const e of d.evs){
     if(e.seq>Guest.lastSeq){Guest.lastSeq=e.seq;queueEvent(e);}
   }

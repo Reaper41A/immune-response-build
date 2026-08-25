@@ -50,7 +50,8 @@ const wormHist=new Map();
 function hydrateHostFromSnap(){
   if(!Guest.snaps.length)return;
   const d=Guest.snaps[Guest.snaps.length-1].d;
-  initWorld(); // promoted host freezes its own arena before resuming the sim
+  if(d.vw&&d.vh){VW=d.vw;VH=d.vh;fitWorld();} // resume in the OLD host's arena
+  else initWorld(); // promoted host freezes its own arena before resuming the sim
   SIM=newSim();
   SIM.wave=d.wave;
   SIM.bodyHp=d.bodyHp;SIM.bodyHpMax=d.bodyHpMax;
@@ -106,40 +107,54 @@ function finalizeView(view){
 
 /* ---------------------------------------------------------------- render */
 function render(view,dtReal){
-  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // bullet-proof frame reset: an error mid-draw must never leak canvas state
+  // (a leaked globalAlpha makes every later clear semi-transparent = ghost trails)
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='source-over';
+  ctx.shadowBlur=0;ctx.shadowColor='rgba(0,0,0,0)';
+  ctx.setLineDash([]);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#05080f';           // letterbox bars match the void
-  ctx.fillRect(0,0,W,H);
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.save();
-  // hard-clip everything to the world rectangle: entities beyond the arena
-  // (spawns walking in, knockback drift) can never smear into the bars
-  ctx.beginPath();
-  ctx.rect(vOffX,vOffY,VW*vScale,VH*vScale);
-  ctx.clip();
-  ctx.translate(vOffX,vOffY);
-  ctx.scale(vScale,vScale);
-  if(FX.shake>0.2&&!REDUCED)ctx.translate(rand(-1,1)*FX.shake*0.4,rand(-1,1)*FX.shake*0.4);
-  drawBackground();
-  if(view){
-    drawTrails(view);
-    drawPerimeter();
-    drawCore(view,hbBeat);
-    drawTurrets(view);
-    drawHazards(view);
-    drawWarns();
-    drawPickups(view);
-    drawEnemies(view);
-    drawProjectiles(view);
-    drawFakeTraces();
-    drawPlayers(view,view.fireRingPid);
-  }else{
-    drawPerimeter();
-    drawCore({bodyHp:1000,bodyHpMax:1000},hbBeat);
+  try{
+    // hard-clip everything to the world rectangle: entities beyond the arena
+    // (spawns walking in, knockback drift) can never smear into the bars
+    ctx.beginPath();
+    ctx.rect(vOffX,vOffY,VW*vScale,VH*vScale);
+    ctx.clip();
+    ctx.translate(vOffX,vOffY);
+    ctx.scale(vScale,vScale);
+    if(FX.shake>0.2&&!REDUCED)ctx.translate(rand(-1,1)*FX.shake*0.4,rand(-1,1)*FX.shake*0.4);
+    drawBackground();
+    if(view){
+      drawTrails(view);
+      drawPerimeter();
+      drawCore(view,hbBeat);
+      drawTurrets(view);
+      drawHazards(view);
+      drawWarns();
+      drawPickups(view);
+      drawEnemies(view);
+      drawProjectiles(view);
+      drawFakeTraces();
+      drawPlayers(view,view.fireRingPid);
+    }else{
+      drawPerimeter();
+      drawCore({bodyHp:1000,bodyHpMax:1000},hbBeat);
+    }
+    drawParticles();
+    drawMotes();
+    drawPopups();
+    if(view)drawEdgeArrows(view);
+  }finally{
+    ctx.restore();
+    ctx.globalAlpha=1;
+    ctx.globalCompositeOperation='source-over';
+    ctx.shadowBlur=0;
   }
-  drawParticles();
-  drawMotes();
-  drawPopups();
-  if(view)drawEdgeArrows(view);
-  ctx.restore();
   FX.shake=Math.max(0,FX.shake-dtReal*40);
 }
 
