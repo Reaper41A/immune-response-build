@@ -38,7 +38,7 @@ function buildHostView(){
     pickups:s.pickups.map(p=>({x:p.x,y:p.y,l:p.life,w:p.wobble})),
     turrets:s.turrets.map(t=>({x:t.x,y:t.y,r:t.range})),
     hazards:s.hazards.map(h=>({x:h.x,y:h.y,r:h.radius,l:h.life})),
-    trails:s.trails.slice(-200),
+    trails:s.trails.slice(COMPACT?-100:-200),
     boss:null,
   };
 }
@@ -114,10 +114,9 @@ function render(view,dtReal){
   ctx.globalCompositeOperation='source-over';
   ctx.shadowBlur=0;ctx.shadowColor='rgba(0,0,0,0)';
   ctx.setLineDash([]);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#05080f';           // letterbox bars match the void
+  ctx.fillStyle='#05080f';           // opaque fill overwrites every pixel (no clearRect needed)
   ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.setTransform(DPR*RES,0,0,DPR*RES,0,0);
   ctx.save();
   try{
     // hard-clip everything to the world rectangle: entities beyond the arena
@@ -160,6 +159,25 @@ function render(view,dtReal){
 
 /* ---------------------------------------------------------------- loop */
 let lastTs=0,simAcc=0,snapTimer=0,hbT=0;
+let lastRenderTs=0;
+/* Adaptive resolution: sustained slow frames step the backing-store scale
+   down (less GPU fill rate = less heat), sustained fast frames step it back
+   up. Bounded 0.6–1.0, re-evaluates at most every ~1.5s of rendered frames. */
+const PERF={ema:16.7,cool:0,last:0};
+function trackPerf(ts){
+  if(!PERF.last){PERF.last=ts;return;}
+  const d=ts-PERF.last;PERF.last=ts;
+  if(d<=0||d>60)return; // ignore tab-switch / stall spikes
+  PERF.ema=PERF.ema*0.9+d*0.1;
+  if(PERF.cool>0){PERF.cool--;return;}
+  if(PERF.ema>21.5&&RES>0.6)setRes(RES-0.15);
+  else if(PERF.ema<17.3&&RES<1)setRes(RES+0.15);
+}
+function setRes(v){
+  RES=Math.max(0.6,Math.min(1,Math.round(v*100)/100));
+  PERF.cool=90;PERF.ema=16.7;
+  resize();
+}
 function loop(ts){
   requestAnimationFrame(loop);
   if(!lastTs)lastTs=ts;
@@ -167,20 +185,33 @@ function loop(ts){
   lastTs=ts;
   dt=clamp(dt,0,0.08);
 
+  // host sim + snapshots tick every rAF (cheap, fixed-step)…
+  if(App.inRun&&App.isHost&&SIM&&!App.paused&&!SIM.over){
+    simAcc+=dt;
+    const step=1/60;
+    let guard=0;
+    while(simAcc>=step&&guard<6){simUpdate(step);simAcc-=step;guard++;}
+    if(SIM)hbT+=dt*(1.4+(1-clamp(SIM.bodyHp/SIM.bodyHpMax,0,1))*1.8);
+    if(App.mode==='mp'){
+      snapTimer-=dt;
+      if(snapTimer<=0){snapTimer=1/15;netSend({t:'snap',d:buildSnapshot()});}
+    }
+  }
+  sendInputsIfGuest(dt);
+
+  // …but rendering is capped at ~60fps: on 120Hz phones this halves the
+  // GPU work (and the heat) with zero visual difference at this art scale
+  if(ts-lastRenderTs<15.4)return;
+  lastRenderTs=ts;
+
+  if(App.inRun&&App.paused){ // pause overlay covers the canvas — skip entirely
+    evQueue.length=0; // drop queued FX/sounds so resume doesn't replay a burst
+    return;
+  }
+
   currentView=null;
   if(App.inRun){
     if(App.isHost&&SIM){
-      if(!App.paused&&!SIM.over){
-        simAcc+=dt;
-        const step=1/60;
-        let guard=0;
-        while(simAcc>=step&&guard<6){simUpdate(step);simAcc-=step;guard++;}
-        if(SIM)hbT+=dt*(1.4+(1-clamp(SIM.bodyHp/SIM.bodyHpMax,0,1))*1.8);
-        if(App.mode==='mp'){
-          snapTimer-=dt;
-          if(snapTimer<=0){snapTimer=1/15;netSend({t:'snap',d:buildSnapshot()});}
-        }
-      }
       currentView=buildHostView();
     }else if(!App.isHost){
       currentView=guestBuildView();
@@ -195,7 +226,6 @@ function loop(ts){
       updateHud(currentView,dt);
       tutorialTriggers(currentView,dt);
       syncDraftScreens(currentView);
-      sendInputsIfGuest(dt);
     }
   }else{
     hbT+=dt*1.4;
@@ -203,6 +233,7 @@ function loop(ts){
     updateFx(dt);
     render(null,dt);
   }
+  trackPerf(ts);
 }
 
 /* ---------------------------------------------------------------- boot */

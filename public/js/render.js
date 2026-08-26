@@ -5,10 +5,36 @@
    ========================================================================== */
 'use strict';
 
+/* Cached glow sprites: shadowBlur and per-frame createRadialGradient are the
+   two most expensive 2D-canvas operations on mobile GPUs. Each glow shape is
+   rasterized ONCE (keyed by color+radius) and blitted with drawImage after. */
+const _glowCache=new Map();
+function glowSprite(color,r){
+  const key=color+'|'+r;
+  let s=_glowCache.get(key);
+  if(!s){
+    const rr=Math.max(1,Math.ceil(r)),pad=8,size=rr*2+pad*2;
+    s=document.createElement('canvas');
+    s.width=size;s.height=size;
+    const g=s.getContext('2d');
+    const grad=g.createRadialGradient(size/2,size/2,0,size/2,size/2,rr);
+    grad.addColorStop(0,hexToRgba(color,1));
+    grad.addColorStop(1,hexToRgba(color,0));
+    g.fillStyle=grad;g.fillRect(0,0,size,size);
+    _glowCache.set(key,s);
+  }
+  return s;
+}
+function blitGlow(spr,x,y,alpha){
+  ctx.globalAlpha=alpha;
+  ctx.drawImage(spr,x-spr.width/2,y-spr.height/2);
+  ctx.globalAlpha=1;
+}
+
 let ambientSeeds=null;
 function drawBackground(){
   if(!bgCache){
-    const k=Math.min(2,Math.max(1,DPR*vScale)); // backing-store quality
+    const k=Math.min(2,Math.max(1,DPR*RES*vScale)); // backing-store quality
     bgCache=document.createElement('canvas');
     bgCache.width=Math.round(VW*k);bgCache.height=Math.round(VH*k);
     const b=bgCache.getContext('2d');
@@ -44,7 +70,7 @@ function drawBackground(){
     ambientSeeds=[];
     for(let i=0;i<9;i++)ambientSeeds.push({sx:rand(0,1000),sy:rand(0,1000),r:rand(26,64),hue:i%2});
   }
-  if(!REDUCED){
+  if(!REDUCED&&!COMPACT){ // ambient drift skipped on phones — pure fill-rate cost
     const t=performance.now()/1000;
     ctx.globalAlpha=0.045;
     for(const s of ambientSeeds){
@@ -72,16 +98,14 @@ function drawPerimeter(){
 
 function drawCore(view,hbBeat){
   const c=worldCore(),r=coreRadius();
-  const pct=clamp(view.bodyHp/view.bodyHpMax,0,1);
+  const pc=Math.round(clamp(view.bodyHp/view.bodyHpMax,0,1)*20)/20; // bucketed → bounded sprite cache
   const healthy={r:62,g:232,b:200},dying={r:122,g:44,b:66};
-  const col={r:Math.round(lerp(dying.r,healthy.r,pct)),g:Math.round(lerp(dying.g,healthy.g,pct)),b:Math.round(lerp(dying.b,healthy.b,pct))};
-  const pulse=1+hbBeat*0.03*pct;
+  const col={r:Math.round(lerp(dying.r,healthy.r,pc)),g:Math.round(lerp(dying.g,healthy.g,pc)),b:Math.round(lerp(dying.b,healthy.b,pc))};
+  const pulse=1+hbBeat*0.03*pc;
   ctx.save();
   ctx.translate(c.x,c.y);ctx.scale(pulse,pulse);
-  const grad=ctx.createRadialGradient(0,0,0,0,0,r*1.5);
-  grad.addColorStop(0,`rgba(${col.r},${col.g},${col.b},${0.30+hbBeat*0.10})`);
-  grad.addColorStop(1,`rgba(${col.r},${col.g},${col.b},0)`);
-  ctx.fillStyle=grad;ctx.beginPath();ctx.arc(0,0,r*1.5,0,Math.PI*2);ctx.fill();
+  const spr=glowSprite('#'+((1<<24)|(col.r<<16)|(col.g<<8)|col.b).toString(16).slice(1),Math.round(r*1.5));
+  blitGlow(spr,0,0,0.30+hbBeat*0.10);
   ctx.fillStyle=`rgb(${col.r},${col.g},${col.b})`;
   ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=2;ctx.stroke();
@@ -102,7 +126,7 @@ function drawCore(view,hbBeat){
   ctx.fillStyle='rgba(255,255,255,0.42)';
   ctx.fillText(Math.round(view.bodyHp)+' HP',0,11);
   ctx.restore();
-  if(pct<=0.3){ // critical state ring
+  if(pc<=0.3){ // critical state ring
     ctx.strokeStyle=`rgba(255,77,109,${0.25+hbBeat*0.35})`;
     ctx.lineWidth=3;
     ctx.beginPath();ctx.arc(c.x,c.y,r+8+hbBeat*4,0,Math.PI*2);ctx.stroke();
@@ -110,24 +134,36 @@ function drawCore(view,hbBeat){
 }
 
 function drawTrails(view){
-  for(const tr of view.trails||[]){
-    const a=clamp(tr.l/3,0,1)*0.35;
-    ctx.fillStyle=`rgba(138,154,91,${a})`;
-    ctx.beginPath();ctx.arc(tr.x,tr.y,tr.w,0,Math.PI*2);ctx.fill();
+  const trs=view.trails||[];
+  if(!trs.length)return;
+  for(let b=0;b<4;b++){ // 4 batched fills instead of one fill per trail blob
+    const lo=b*0.25,hi=lo+0.25;
+    ctx.beginPath();
+    let n=0;
+    for(const tr of trs){
+      const a=clamp(tr.l/3,0,1);
+      if(a<lo||a>=hi)continue;
+      ctx.moveTo(tr.x+tr.w,tr.y);
+      ctx.arc(tr.x,tr.y,tr.w,0,Math.PI*2);
+      n++;
+    }
+    if(!n)continue;
+    ctx.fillStyle=`rgba(138,154,91,${(hi*0.35).toFixed(3)})`;
+    ctx.fill();
   }
 }
 function drawHazards(view){
   const t=performance.now()/1000;
+  const spr=glowSprite('#d4ff4d',56);
   for(const hz of view.hazards||[]){
     const R=hz.r||hz.radius||0; // views carry `r` (host + snapshot); SIM carries `radius`
     if(!(R>0))continue;
     const fade=clamp(hz.l/1.8,0,1);
+    const s=R*(0.9+Math.sin(t*3)*0.08)/56;
     ctx.save();
-    ctx.globalAlpha=fade*0.4;
-    const g=ctx.createRadialGradient(hz.x,hz.y,0,hz.x,hz.y,R);
-    g.addColorStop(0,'rgba(212,255,77,0.55)');g.addColorStop(1,'rgba(212,255,77,0)');
-    ctx.fillStyle=g;
-    ctx.beginPath();ctx.arc(hz.x,hz.y,R*(0.9+Math.sin(t*3)*0.08),0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=fade*0.22;
+    ctx.translate(hz.x,hz.y);ctx.scale(s,s);
+    ctx.drawImage(spr,-spr.width/2,-spr.height/2);
     ctx.restore();
   }
 }
@@ -150,36 +186,27 @@ function drawWarns(){
   }
 }
 function drawTurrets(view){
+  const spr=glowSprite('#ffd166',16);
   for(const t of view.turrets||[]){
-    ctx.save();
-    ctx.translate(t.x,t.y);
-    ctx.fillStyle='rgba(255,209,102,0.08)';
-    ctx.beginPath();ctx.arc(0,0,t.r,0,Math.PI*2);ctx.fill();
+    blitGlow(spr,t.x,t.y,0.4);
     ctx.fillStyle='#ffd166';
-    ctx.shadowColor='#ffd166';ctx.shadowBlur=10;
-    ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
+    ctx.beginPath();ctx.arc(t.x,t.y,9,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.stroke();
-    ctx.restore();
+    ctx.beginPath();ctx.arc(t.x,t.y,4,0,Math.PI*2);ctx.stroke();
   }
 }
 function drawPickups(view){
   const t=performance.now()/1000;
+  const spr=glowSprite('#8fe36a',16);
   for(const pk of view.pickups||[]){
     const bob=Math.sin(t*3+(pk.w||0))*4;
     const fadeOut=pk.l<2?clamp(pk.l/2,0,1):1;
-    ctx.save();
+    blitGlow(spr,pk.x,pk.y+bob,0.5*fadeOut);
     ctx.globalAlpha=fadeOut;
-    const g=ctx.createRadialGradient(pk.x,pk.y+bob,0,pk.x,pk.y+bob,16);
-    g.addColorStop(0,'rgba(143,227,106,0.5)');g.addColorStop(1,'rgba(143,227,106,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(pk.x,pk.y+bob,16,0,Math.PI*2);ctx.fill();
     ctx.fillStyle='#8fe36a';
-    ctx.shadowColor='#8fe36a';ctx.shadowBlur=8;
     ctx.beginPath();ctx.arc(pk.x,pk.y+bob,5,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
     ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1;ctx.stroke();
-    ctx.restore();
+    ctx.globalAlpha=1;
   }
 }
 function drawProjectiles(view){
@@ -193,10 +220,10 @@ function drawProjectiles(view){
       i===0?ctx.moveTo(pt[0],pt[1]):ctx.lineTo(pt[0],pt[1]);
     }
     ctx.lineTo(pr.x,pr.y);ctx.stroke();
+    const spr=glowSprite(pr.c,pr.sp?12:9);
+    blitGlow(spr,pr.x,pr.y,0.55);
     ctx.fillStyle=pr.c;
-    ctx.shadowColor=pr.c;ctx.shadowBlur=6;
     ctx.beginPath();ctx.arc(pr.x,pr.y,pr.sp?5:4,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
   }
 }
 function drawFakeTraces(){
@@ -230,17 +257,13 @@ function drawParticles(){
   ctx.globalAlpha=1;
 }
 function drawMotes(){
+  const spr=glowSprite('#3ee8c8',8);
   for(const m of FX.motes){
     if(m.t<0)continue;
     const x=lerp(m.x,m.tx,m.t);
     const y=lerp(m.y,m.ty,m.t)-Math.sin(m.t*Math.PI)*40;
-    ctx.globalAlpha=1-m.t*m.t;
-    ctx.fillStyle='#3ee8c8';
-    ctx.shadowColor='#3ee8c8';ctx.shadowBlur=6;
-    ctx.beginPath();ctx.arc(x,y,2.6,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
+    blitGlow(spr,x,y,(1-m.t*m.t)*0.7);
   }
-  ctx.globalAlpha=1;
 }
 function drawPopups(){
   ctx.textAlign='center';

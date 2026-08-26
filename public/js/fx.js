@@ -17,7 +17,8 @@ const FX={
 function shake(n){if(!REDUCED)FX.shake=Math.min(22,FX.shake+n);}
 
 function spawnParticle(x,y,vx,vy,life,size,color,type){
-  if(FX.parts.length>420)FX.parts.shift();
+  const cap=COMPACT?240:420; // phones: smaller particle budget = less fill rate
+  if(FX.parts.length>cap)FX.parts.shift();
   FX.parts.push({x,y,vx,vy,life,maxLife:life,size,color,type});
 }
 function deathBurst(x,y,color,scale=1){

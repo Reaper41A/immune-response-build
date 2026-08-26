@@ -26,8 +26,10 @@ function hexToRgba(hex,a){
 
 /* ---------------------------------------------------------------- canvas */
 const canvas=$('gameCanvas');
-const ctx=canvas.getContext('2d');
+const ctx=canvas.getContext('2d',{alpha:false}); // opaque → compositor skips per-frame blending (big mobile heat win)
 let W=0,H=0,DPR=1;
+let RES=1;          // adaptive backing-store scale (PERF controller in main.js)
+let COMPACT=false;  // phone-class viewport — drives world size, FX budgets
 let bgCache=null;
 /* The battle arena lives in FIXED virtual coordinates (VW×VH), frozen at run
    start. Resizes (phone URL bar, rotation, window dragging) only rescale the
@@ -39,7 +41,10 @@ function resize(){
   const rect=wrap.getBoundingClientRect();
   DPR=Math.min(window.devicePixelRatio||1,2);
   W=Math.max(1,Math.round(rect.width));H=Math.max(1,Math.round(rect.height));
-  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  COMPACT=Math.min(W,H)<520;
+  if(!resize.init){resize.init=true;RES=COMPACT?0.85:1;} // phones start cooler, PERF adapts from there
+  canvas.width=Math.max(1,Math.round(W*DPR*RES));
+  canvas.height=Math.max(1,Math.round(H*DPR*RES));
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   fitWorld();
 }
@@ -52,9 +57,8 @@ function initWorld(){
   const ar=clamp(W/Math.max(1,H),0.62,2.2);
   // phones get a physically smaller arena so the projection scale (and thus
   // every entity on screen) stays readable instead of shrinking into the distance
-  const compact=Math.min(W,H)<520;
-  VH=compact?700:900;
-  VW=Math.round(clamp(VH*ar,compact?500:700,1760));
+  VH=COMPACT?700:900;
+  VW=Math.round(clamp(VH*ar,COMPACT?500:700,1760));
   fitWorld();
 }
 window.addEventListener('resize',resize);

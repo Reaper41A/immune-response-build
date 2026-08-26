@@ -16,9 +16,15 @@ function cacheHudRefs(){
    'vignetteLow'].forEach(id=>HUDREF[id]=$(id));
 }
 let hudSlowTimer=0;
+let hudFastTimer=0;
 let lastSquadKey='';
 function updateHud(view,dt){
   if(!view)return;
+  // 15Hz ceiling: every style/text write here costs layout+paint on phones,
+  // and the CSS transitions smooth the steps anyway
+  hudFastTimer-=dt;
+  if(hudFastTimer>0)return;
+  hudFastTimer=1/15;
   const pct=clamp(view.bodyHp/view.bodyHpMax,0,1);
   HUDREF.bodyHpFill.style.width=(pct*100)+'%';
   let c1='#2fd18f',c2='#3ee8c8';

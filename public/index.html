@@ -480,6 +480,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   .lobby-panel{padding:14px;max-height:calc(100vh - 70px);}
   .slot{flex-wrap:wrap;gap:5px 8px;padding:8px 10px;}
   .class-grid{grid-template-columns:repeat(auto-fit,minmax(136px,1fr));}
+  /* backdrop blur forces per-frame compositing on weak GPUs — swap for opaque fills */
+  .callout,.squad-mate,.hint-chip,.out-of-ammo-banner{backdrop-filter:none;background:rgba(10,18,32,.94);}
 }
 </style>
 </head>

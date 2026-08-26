@@ -30,13 +30,9 @@ function drawEnemies(view){
     let alpha=1;
     if(en.cl)alpha=0.35;
     if(en.mg===3)alpha=0.5+Math.abs(Math.sin(t*30))*0.4; // telegraph flicker
+    const gr=en.hm>500?def.radius*2.6:def.radius*2.2;
+    blitGlow(glowSprite(def.glow,Math.ceil(gr)),0,0,alpha*0.32);
     ctx.globalAlpha=alpha;
-
-    const glow=ctx.createRadialGradient(0,0,0,0,0,en.hm>500?def.radius*2.6:def.radius*2.2);
-    glow.addColorStop(0,hexToRgba(def.glow,0.32));
-    glow.addColorStop(1,hexToRgba(def.glow,0));
-    ctx.fillStyle=glow;
-    ctx.beginPath();ctx.arc(0,0,(en.hm>500?def.radius*2.6:def.radius*2.2),0,Math.PI*2);ctx.fill();
 
     const flash=en.tf>0?en.tf/0.15:0;
     ctx.fillStyle=flash>0?`rgba(255,255,255,${0.55+flash*0.45})`:def.color;
@@ -137,9 +133,7 @@ function drawMimicDisguised(en,t,victim){
   // the tell: periodic glitch shimmer + slightly desaturated body
   const glitch=Math.sin(t*1.7+en.i)>0.93?rand(-2,2):0;
   if(glitch)ctx.translate(glitch,glitch);
-  const g=ctx.createRadialGradient(0,0,0,0,0,en.hm?26:26);
-  g.addColorStop(0,hexToRgba(color,0.28));g.addColorStop(1,hexToRgba(color,0));
-  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,26,0,Math.PI*2);ctx.fill();
+  blitGlow(glowSprite(color,26),0,0,0.28);
   ctx.globalAlpha*=0.94;
   ctx.fillStyle=color;
   ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();
@@ -252,10 +246,9 @@ function drawPlayers(view,firingRingFor){
     }
     ctx.save();
     ctx.translate(p.x,p.y);
-    if(view.invulnHint===p.i)ctx.globalAlpha=0.6+Math.sin(performance.now()/40)*0.3;
-    const grad=ctx.createRadialGradient(0,0,0,0,0,34);
-    grad.addColorStop(0,hexToRgba(p.col,0.3));grad.addColorStop(1,hexToRgba(p.col,0));
-    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(0,0,34,0,Math.PI*2);ctx.fill();
+    const baseA=view.invulnHint===p.i?0.6+Math.sin(performance.now()/40)*0.3:1;
+    blitGlow(glowSprite(p.col,34),0,0,baseA*0.3);
+    ctx.globalAlpha=baseA;
 
     // YOU ring — magenta, pulsing, ONLY on the local player
     if(p.i===App.myPid){
@@ -265,9 +258,7 @@ function drawPlayers(view,firingRingFor){
       ctx.beginPath();ctx.arc(0,0,22*pulse,0,Math.PI*2);ctx.stroke();
     }
     ctx.fillStyle=p.col;
-    ctx.shadowColor=p.col;ctx.shadowBlur=10;
     ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
     ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':'rgba(255,255,255,0.65)';
     ctx.lineWidth=1.5;ctx.stroke();
     // facing nub
