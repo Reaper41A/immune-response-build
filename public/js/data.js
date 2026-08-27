@@ -167,5 +167,6 @@ const CLASS_EVOLUTIONS={
 };
 const EVO_BY_ID={};Object.values(CLASS_EVOLUTIONS).flat().forEach(e=>EVO_BY_ID[e.id]=e);
 
-const DRAFT_DURATIONS={squad:20,personal:18,evolution:16};
+// squad is unused now — squadDraft has no timer, it's a group vote (see waves.js enterSquadDraft)
+const DRAFT_DURATIONS={squad:20,personal:25,evolution:20};
 const RESPAWN_SECONDS=8;

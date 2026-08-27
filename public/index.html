@@ -65,8 +65,28 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 }
 .screen.hidden{display:none;}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{to{opacity:0}}
+/* Closing fade must win over the opening fadeIn animation — declared after
+   it and paired with `!important`-free specificity via the compound
+   selector below is enough since both target the same element's animation
+   property and .closing is applied after .screen already rendered. */
+.screen.closing{animation:fadeOut .19s ease forwards;pointer-events:none;}
 @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{0%{opacity:0;transform:scale(.92)}70%{transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
+
+/* Draft screens run alongside live gameplay (players can reposition while
+   they're up) so — unlike every other full-stop screen — the backdrop must
+   let touches/clicks fall through to the game underneath. Only the panel
+   itself should intercept input. Anchoring it to the top keeps it clear of
+   the bottom-left joystick zone and the bottom-right fire button. */
+#screenDraft{
+  pointer-events:none;
+  justify-content:flex-start;
+  padding-top:calc(64px + env(safe-area-inset-top));
+  background:radial-gradient(ellipse at 50% -10%,rgba(26,44,68,.35),rgba(5,8,15,.45) 78%);
+  backdrop-filter:blur(2px);
+}
+#screenDraft .draft-panel{pointer-events:auto;}
 
 .cell-title{
   font-size:clamp(30px,6vw,56px);font-weight:800;letter-spacing:-.02em;margin:0 0 2px;text-align:center;
@@ -383,6 +403,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .draft-timer-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--infect));}
 .draft-timer-fill.urgent{background:linear-gradient(90deg,var(--infect),#ff8ea0);}
 .draft-timer-num{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--dim);min-width:38px;text-align:right;}
+/* Squad draft is a group decision with no countdown — hide the timer bar
+   entirely rather than show a fake full/frozen one. */
+.draft-panel.no-timer .draft-timer-row{display:none;}
 .draft-timer-num.urgent{color:#ff8ea0;}
 .summary-row{display:flex;justify-content:space-around;margin-bottom:14px;font-family:var(--font-mono);font-size:10px;color:var(--dim);}
 .summary-row b{color:var(--tissue);display:block;font-size:15px;font-family:var(--font-ui);margin-top:1px;}
@@ -477,6 +500,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   .callout-feed{top:148px;}
   .boss-bar{top:100px;}
   .draft-panel{padding:14px;}
+  /* Keep the draft panel clear of the joystick (bottom-left) and fire
+     button (bottom-right) so repositioning during a draft stays possible. */
+  #screenDraft .draft-panel{max-height:46vh;}
   .lobby-panel{padding:14px;max-height:calc(100vh - 70px);}
   .slot{flex-wrap:wrap;gap:5px 8px;padding:8px 10px;}
   .class-grid{grid-template-columns:repeat(auto-fit,minmax(136px,1fr));}
@@ -752,10 +778,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       </div>
       <div class="summary-row" id="draftSummary"></div>
       <div class="upgrade-list" id="draftList"></div>
-      <div class="draft-actions">
-        <button class="btn small" id="btnConfirmDraft" style="flex:1;">Confirm Pick</button>
-        <button class="btn ghost small" id="btnSkipDraft">Skip</button>
-      </div>
       <div class="draft-note" id="draftNote"></div>
     </div>
   </div>

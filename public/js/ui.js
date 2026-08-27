@@ -8,14 +8,24 @@ const BOT_SEEDS=[['Rho-2','macrophage'],['Kai-9','bcell'],['Iyo-4','nk']];
 let hbBeat=0;
 
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
-  $('hud').classList.remove('active');
+  // Draft screens run over live gameplay — the HUD (joystick, fire button,
+  // health, etc.) must stay visible and touchable underneath them so players
+  // can still reposition. Every other screen is a full stop, so HUD hides.
+  const isDraft=id==='screenDraft';
+  document.querySelectorAll('.screen').forEach(s=>{
+    if(s.id===id){clearTimeout(s._closeT);s.classList.remove('closing','hidden');return;}
+    if(s.classList.contains('hidden'))return;
+    // Fade the outgoing screen out instead of yanking it away instantly —
+    // an abrupt cut when a draft/menu closes is disorienting mid-action.
+    s.classList.add('closing');
+    clearTimeout(s._closeT);
+    s._closeT=setTimeout(()=>{s.classList.add('hidden');s.classList.remove('closing');},190);
+  });
+  $('hud').classList.toggle('active',!id||isDraft);
   if(id){
-    $(id).classList.remove('hidden');
     App.screen=id.replace('screen','').toLowerCase();
     if(id==='screenSplash')refreshRejoinButton();
   }else{
-    $('hud').classList.add('active');
     App.screen='playing';
   }
 }
@@ -164,12 +174,13 @@ function openDraftScreen(phase){
   AudioSys.play('draftOpen');
   const panel=$('screenDraft');
   const title=$('draftTitle'),sub=$('draftSub'),note=$('draftNote');
-  $('btnConfirmDraft').style.display='';
-  $('btnSkipDraft').style.display='';
+  panel.classList.toggle('no-timer',phase==='squadDraft');
+  // All draft kinds are select-and-lock now — nothing single-handedly closes
+  // the screen for the group, so there's no confirm/skip button anymore.
   if(phase==='squadDraft'){
     title.textContent='SQUAD DRAFT';title.style.color='var(--gold)';
     sub.textContent='One shared upgrade, bought with squad EP.';
-    note.innerHTML='Click a card, then <b>Confirm</b>. Whoever confirms buys their highlighted card — bot votes are advice, not law. Skipping buys nothing.';
+    note.innerHTML='Click a card to lock in your vote. This is a <b>group decision</b> — the most-voted affordable card is bought once <b>everyone</b> has voted. No timer, no rush.';
   }else if(phase==='personalDraft'){
     title.textContent='YOUR EVOLUTION';title.style.color='var(--plasma)';
     sub.textContent='A personal perk — free, just for you.';
@@ -221,11 +232,15 @@ function renderDraftList(votesMap){
 function selectDraftOption(id,afford){
   AudioSys.play('ui');
   if(draftKind==='squadDraft'){
+    // A vote, not a confirm — anyone can change their mind right up until
+    // the whole squad has picked. Nobody's single tap can close this for
+    // everyone else; the host only resolves it once every human has voted
+    // (see resolveSquadDraft in waves.js).
     if(!afford){toast('Not enough EP for that upgrade',true);return;}
     draftSelId=id;
     renderDraftList(currentView&&currentView.votes);
     if(App.mode==='mp'&&!App.isHost)netSend({t:'g',d:{a:'vote',id}});
-    else if(SIM&&SIM.draft)SIM.draft.votes[App.myPid]=id;
+    else if(SIM&&SIM.draft)voteSquad(App.myPid,id);
   }else{
     draftSelId=id;
     renderDraftList();
@@ -236,28 +251,6 @@ function selectDraftOption(id,afford){
     else netSend({t:'g',d:{a:draftKind==='personalDraft'?'perk':'evo',id}});
   }
 }
-function confirmSquad(){
-  if(draftKind!=='squadDraft')return;
-  if(draftSelId==null){toast('Pick a card first — or Skip',true);return;}
-  AudioSys.play('confirm');
-  draftLocalDone=true;
-  if(App.isHost&&SIM)confirmSquadDraftHost(App.myPid,draftSelId);
-  else netSend({t:'g',d:{a:'confirm',id:draftSelId}});
-  closeDraftSoon();
-}
-function skipSquad(){
-  if(draftKind!=='squadDraft')return;
-  draftLocalDone=true;
-  if(App.isHost&&SIM)confirmSquadDraftHost(App.myPid,null,false);
-  else netSend({t:'g',d:{a:'confirm',id:null}});
-  closeDraftSoon();
-}
-function closeDraftSoon(){setTimeout(()=>{
-    // Only auto-close if the sim has left draft phases entirely — if the
-    // next draft (e.g. personal perks) already began, the modal must stay
-    // open and re-render for the new phase instead.
-    if(App.screen==='draft'&&currentView&&!DRAFT_KINDS.includes(currentView.phase))showScreen(null);
-  },200);}
 let currentView=null;
 function syncDraftScreens(view){
   const ph=view.phase;
@@ -267,13 +260,24 @@ function syncDraftScreens(view){
     const showingThisPhase=App.screen==='draft'&&draftKind===ph;
     if(!showingThisPhase&&!(App.screen!=='draft'&&draftLocalDone&&draftKind===ph))openDraftScreen(ph);
     if(App.screen==='draft'){
-      const t=Math.max(0,Math.ceil(view.phaseLeft));
-      $('draftTimerNum').textContent=t+'s';
-      $('draftTimerFill').style.width=(clamp(view.phaseLeft/Math.max(1,view.phaseDur),0,1)*100)+'%';
-      const urgent=view.phaseLeft<=5;
-      $('draftTimerFill').classList.toggle('urgent',urgent);
-      $('draftTimerNum').classList.toggle('urgent',urgent);
-      $('draftKicker').textContent='WAVE '+view.wave+' CLEARED';
+      if(ph==='squadDraft'){
+        // Group decision — no countdown to show or race against.
+        $('draftTimerNum').textContent='';
+        $('draftTimerFill').style.width='100%';
+        $('draftTimerFill').classList.remove('urgent');
+        $('draftTimerNum').classList.remove('urgent');
+        const votedCount=(view.players||[]).filter(p=>p.h&&view.votes&&view.votes[p.i]!=null).length;
+        const humanCount=(view.players||[]).filter(p=>p.h).length;
+        $('draftKicker').textContent=`WAVE ${view.wave} CLEARED · ${votedCount}/${humanCount} VOTED`;
+      }else{
+        const t=Math.max(0,Math.ceil(view.phaseLeft));
+        $('draftTimerNum').textContent=t+'s';
+        $('draftTimerFill').style.width=(clamp(view.phaseLeft/Math.max(1,view.phaseDur),0,1)*100)+'%';
+        const urgent=view.phaseLeft<=5;
+        $('draftTimerFill').classList.toggle('urgent',urgent);
+        $('draftTimerNum').classList.toggle('urgent',urgent);
+        $('draftKicker').textContent='WAVE '+view.wave+' CLEARED';
+      }
       const sum=$('draftSummary');
       if(sum)sum.innerHTML=
         `<div>WAVE CLEARED<b>${view.wave}</b></div>`+
@@ -286,23 +290,12 @@ function syncDraftScreens(view){
     if(App.screen==='draft')showScreen(null);
   }
 }
-/* host-side wrapper so UI + network land in one place */
-function confirmSquadDraftHost(pid,id){
-  if(!SIM||SIM.phase!=='squadDraft'||SIM.draft.confirmedBy)return;
-  SIM.draft.confirmedBy=pid!=null?pid:-1;
-  if(id&&SIM.ep>=UPG_BY_ID[id].cost){
-    SIM.ep-=UPG_BY_ID[id].cost;
-    applyUpgrade(id);
-    ev({k:'buy',name:UPG_BY_ID[id].name,pid});
-  }else if(id){
-    ev({k:'say',sys:true,text:`Not enough EP for ${UPG_BY_ID[id].name} — draft skipped`,color:'#ff8ea0'});
-  }
-  enterPersonalDrafts();
-}
 function applyGuestAction(pid,d){
   if(!SIM)return;
-  if(d.a==='vote'&&SIM.phase==='squadDraft')SIM.draft.votes[pid]=d.id;
-  else if(d.a==='confirm'&&SIM.phase==='squadDraft')confirmSquadDraftHost(pid,d.id);
+  // Squad draft: every action is just a vote now — nothing a guest sends
+  // can close the screen for the rest of the squad. Resolution happens
+  // automatically once everyone has voted (simUpdate → resolveSquadDraft).
+  if((d.a==='vote'||d.a==='confirm')&&SIM.phase==='squadDraft')voteSquad(pid,d.id);
   else if(d.a==='perk'&&SIM.phase==='personalDraft')pickPersonal(pid,d.id);
   else if(d.a==='evo'&&SIM.phase==='evolution')pickEvolution(pid,d.id);
 }

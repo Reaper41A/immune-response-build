@@ -16,7 +16,7 @@ function buildHostView(){
     threats:s.spawnQueue.length+s.pendingSpawns.length+s.enemies.length,
     squadOptions:s.draft?s.draft.options:null,
     votes:s.draft?s.draft.votes:null,
-    confirmedBy:s.draft?s.draft.confirmedBy:null,
+    voteLocks:s.draft?s.draft.locked:null,
     personalOptions:mapDraftOpts(s.personalDrafts),
     evoOptions:mapDraftOpts(s.evolutions),
     players:s.players.map(p=>({
@@ -321,9 +321,6 @@ function wireUi(){
     else{App.inRun=false;SIM=null;showScreen('screenSplash');}
   });
 
-  $('btnConfirmDraft').addEventListener('click',confirmSquad);
-  $('btnSkipDraft').addEventListener('click',skipSquad);
-
   $('btnRetry').addEventListener('click',()=>{
     if(App.mode==='mp'){netSend({t:'toLobby'});toast('Returning squad to lobby…');}
     else startSoloRun();
@@ -343,9 +340,9 @@ function wireUi(){
         const cards=document.querySelectorAll('#draftList .upgrade-card');
         const card=cards[Number(e.key)-1];
         if(card)card.click();
-      }else if(e.key==='Enter'&&draftKind==='squadDraft'){
-        confirmSquad();
       }
+      // Squad draft no longer has a separate confirm step — picking a card
+      // (click or number key) casts the vote immediately.
     }
   });
   document.addEventListener('visibilitychange',()=>{

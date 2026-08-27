@@ -46,7 +46,10 @@ function startWave(){
   SIM.waveActive=true;
   SIM.spawnQueue=planWave(SIM.wave);
   SIM.pendingSpawns=[];
-  SIM.waveTimer=0;
+  // Small negative lead-in: the draft screen has just closed, so give the
+  // squad a breath to reposition before the first telegraph appears instead
+  // of enemies queuing up the instant the screen disappears.
+  SIM.waveTimer=-1.4;
   SIM.waveStats={leaked:0,killed:0,spawned:SIM.spawnQueue.length};
   for(const p of SIM.players){p.ammo=p.ammoMax;p.heat=0;p.overheated=false;p.overheatTimer=0;}
   // "New pathogen" education: banner names a type's first-ever appearance.
@@ -96,17 +99,21 @@ function enterSquadDraft(){
   const pool=[...UPGRADE_POOL.map(u=>u.id)];
   const opts=[];
   while(opts.length<3&&pool.length)opts.push(pool.splice(randi(0,pool.length-1),1)[0]);
-  SIM.draft={options:opts,votes:{},confirmedBy:null};
-  SIM.phaseTimer=DRAFT_DURATIONS.squad;SIM.phaseDur=DRAFT_DURATIONS.squad;
+  // Squad draft is a group decision: everyone selects, nobody can close it
+  // alone. No countdown either — the screen waits as long as it takes for
+  // every human to lock in a choice (or explicitly abstain).
+  SIM.draft={options:opts,votes:{},locked:{}};
+  SIM.phaseTimer=Infinity;SIM.phaseDur=Infinity;
   ev({k:'phase',phase:'squadDraft'});
   for(const p of SIM.players){
     if(!p.isBot)continue;
     setTimeout(()=>{
-      if(!SIM||SIM.over||SIM.phase!=='squadDraft'||(SIM.draft&&SIM.draft.confirmedBy))return;
+      if(!SIM||SIM.over||SIM.phase!=='squadDraft')return;
       let pick;
       if(SIM.bodyHp<SIM.bodyHpMax*0.4)pick=SIM.draft.options.find(id=>UPG_BY_ID[id].cat==='survival')||choice(SIM.draft.options);
       else pick=choice(SIM.draft.options);
       SIM.draft.votes[p.pid]=pick;
+      SIM.draft.locked[p.pid]=true;
       ev({k:'say',who:p.name,text:`Voting ${UPG_BY_ID[pick].name}`,color:p.color});
     },rand(700,2600));
   }
@@ -120,16 +127,28 @@ function topVotedAffordable(){
   }
   return best;
 }
-function confirmSquadDraft(pid,pickedId){
-  if(!SIM||SIM.over||SIM.phase!=='squadDraft'||SIM.draft.confirmedBy)return;
-  SIM.draft.confirmedBy=pid!=null?pid:-1;
-  const id=pickedId||topVotedAffordable();
+/* A player selects/changes their vote — this is not a confirm, just a pick.
+   The draft only resolves once every human has locked one in (see
+   allHumansVotedSquad + resolveSquadDraft, ticked from simUpdate). */
+function voteSquad(pid,id){
+  if(!SIM||SIM.over||SIM.phase!=='squadDraft')return;
+  SIM.draft.votes[pid]=id;
+  SIM.draft.locked[pid]=true;
+}
+function allHumansVotedSquad(){
+  for(const p of SIM.players){if(p.human&&!SIM.draft.locked[p.pid])return false;}
+  return true;
+}
+/* Resolves the group's shared pick once everyone has voted. No single
+   player's action can force this early or skip it for the rest of the squad. */
+function resolveSquadDraft(){
+  const id=topVotedAffordable();
   const opt=id?UPG_BY_ID[id]:null;
   if(opt){
     if(SIM.ep>=opt.cost){
       SIM.ep-=opt.cost;
       applyUpgrade(opt.id);
-      ev({k:'buy',name:opt.name,pid:pid||-1});
+      ev({k:'buy',name:opt.name,pid:-1});
     }else{
       ev({k:'say',sys:true,text:`Not enough EP for ${opt.name} — draft skipped`,color:'#ff8ea0'});
     }

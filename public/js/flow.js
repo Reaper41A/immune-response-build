@@ -120,15 +120,38 @@ function updateHumanPlayer(p,dt){
   }
 }
 
+/* Movement-only tick used while a draft screen is up: squadmates can walk
+   around and reposition, but nothing fires, targets, or takes/deals damage.
+   Kept intentionally minimal and separate from updateHumanPlayer/updateBot
+   so draft downtime can never accidentally trigger combat side effects. */
+function updateDraftMovement(p,dt){
+  if(!p.alive)return;
+  if(App.isHost&&p.pid===App.myPid&&!p.isBot){
+    p.inMove.x=Input.move.x;p.inMove.y=Input.move.y;
+  }
+  if(p.isBot)return; // bots hold position and wait like the humans decide
+  let mx=p.inMove.x,my=p.inMove.y;
+  const len=Math.hypot(mx,my);
+  if(len>1){mx/=len;my/=len;}
+  p.x+=mx*p.speed*dt;p.y+=my*p.speed*dt;
+  if(len>0.05)p.facing=Math.atan2(my,mx);
+  clampToArena(p);
+  autoPickup(p);
+}
+
 /* ---------------------------------------------------------------- main step */
 function simUpdate(dt){
   SIM.time+=dt;
   SIM.events.length=0;
 
-  // Draft phases tick on wall-clock while the battlefield holds its breath.
+  // Draft phases tick on wall-clock while combat holds its breath — but
+  // players can still walk around and reposition for the wave ahead instead
+  // of being frozen in place.
   if(SIM.phase!=='wave'){
-    SIM.phaseTimer-=dt;
+    if(SIM.phase!=='squadDraft')SIM.phaseTimer-=dt; // squad draft has no timer — it's a group decision
+    for(const p of SIM.players)updateDraftMovement(p,dt);
     resolveDraftTimeouts();
+    if(SIM.phase==='squadDraft'&&allHumansVotedSquad())resolveSquadDraft();
     if(SIM.phase==='personalDraft'&&allHumansPicked(SIM.personalDrafts))finishPersonalDrafts(false);
     if(SIM.phase==='evolution'&&allHumansPicked(SIM.evolutions))finishEvolutions(false);
     flushEvents();
@@ -262,9 +285,9 @@ function simUpdate(dt){
 
 function resolveDraftTimeouts(){
   if(!SIM||SIM.over)return;
-  if(SIM.phase==='squadDraft'&&SIM.phaseTimer<=0&&!SIM.draft.confirmedBy){
-    confirmSquadDraft(-1,topVotedAffordable());
-  }else if(SIM.phase==='personalDraft'&&SIM.phaseTimer<=0){
+  // Squad draft has no timeout — it only ever resolves once every human has
+  // voted (see resolveSquadDraft, ticked in simUpdate).
+  if(SIM.phase==='personalDraft'&&SIM.phaseTimer<=0){
     finishPersonalDrafts(true);
   }else if(SIM.phase==='evolution'&&SIM.phaseTimer<=0){
     finishEvolutions(true);

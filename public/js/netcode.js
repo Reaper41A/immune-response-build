@@ -14,8 +14,10 @@ function buildSnapshot(){
     ts:r1(s.time),
     vw:VW,vh:VH, // guests must project the host's frozen arena, not their own
     phase:s.phase,
-    phaseLeft:r1(Math.max(0,s.phaseTimer)),
-    phaseDur:s.phaseDur,
+    // squadDraft has no timer (Infinity) — JSON can't carry that, so guests
+    // just get 0/0 and the UI treats squadDraft as timerless regardless.
+    phaseLeft:Number.isFinite(s.phaseTimer)?r1(Math.max(0,s.phaseTimer)):0,
+    phaseDur:Number.isFinite(s.phaseDur)?s.phaseDur:0,
     wave:s.wave,
     ep:Math.round(s.ep),
     bodyHp:Math.round(s.bodyHp),bodyHpMax:s.bodyHpMax,
@@ -23,7 +25,7 @@ function buildSnapshot(){
     threats:s.spawnQueue.length+s.pendingSpawns.length+s.enemies.length,
     squadOptions:s.draft?s.draft.options:null,
     votes:s.draft?s.draft.votes:null,
-    confirmedBy:s.draft?s.draft.confirmedBy:null,
+    voteLocks:s.draft?s.draft.locked:null,
     personalOptions:mapDraftOpts(s.personalDrafts),
     evoOptions:mapDraftOpts(s.evolutions),
     players:s.players.map(p=>({
@@ -85,7 +87,7 @@ function guestBuildView(){
     phase:db.phase,phaseLeft:db.phaseLeft,phaseDur:db.phaseDur,
     wave:db.wave,ep:db.ep,bodyHp:db.bodyHp,bodyHpMax:db.bodyHpMax,
     organs:db.organs,debuffs:db.debuffs,threats:db.threats,
-    squadOptions:db.squadOptions,votes:db.votes,confirmedBy:db.confirmedBy,
+    squadOptions:db.squadOptions,votes:db.votes,voteLocks:db.voteLocks,
     personalOptions:db.personalOptions,evoOptions:db.evoOptions,
     players:db.players.map(pb=>{
       const pa=da.players.find(x=>x.i===pb.i);
