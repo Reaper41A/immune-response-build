@@ -32,7 +32,11 @@ function blitGlow(spr,x,y,alpha){
 }
 
 let ambientSeeds=null;
-function drawBackground(){
+let veinSeeds=null;
+let floatCells=null;
+let driftOrganisms=null;
+
+function drawBackground(hbBeat){
   if(!bgCache){
     const k=Math.min(2,Math.max(1,DPR*RES*vScale)); // backing-store quality
     bgCache=document.createElement('canvas');
@@ -42,22 +46,6 @@ function drawBackground(){
     const g=b.createRadialGradient(VW*0.5,VH*0.45,0,VW*0.5,VH*0.45,Math.max(VW,VH)*0.72);
     g.addColorStop(0,'#0d1b2a');g.addColorStop(0.6,'#091120');g.addColorStop(1,'#05080f');
     b.fillStyle=g;b.fillRect(0,0,VW,VH);
-    // capillaries radiating from the core quietly teach "threats come from anywhere"
-    const c={x:VW*0.5,y:VH*0.52};
-    b.strokeStyle='rgba(127,214,255,0.05)';
-    b.lineCap='round';
-    for(let i=0;i<14;i++){
-      const a=(i/14)*Math.PI*2+0.3;
-      b.lineWidth=rand(6,13);
-      b.beginPath();
-      b.moveTo(c.x+Math.cos(a)*coreRadius()*1.2,c.y+Math.sin(a)*coreRadius()*1.2);
-      const midR=Math.max(VW,VH)*0.33;
-      b.quadraticCurveTo(
-        c.x+Math.cos(a+0.35)*midR,c.y+Math.sin(a+0.35)*midR,
-        c.x+Math.cos(a-0.15)*Math.max(VW,VH)*0.78,c.y+Math.sin(a-0.15)*Math.max(VW,VH)*0.78
-      );
-      b.stroke();
-    }
     // tissue speckle
     for(let i=0;i<130;i++){
       const x=rand(0,VW),y=rand(0,VH),r=rand(1,4);
@@ -66,6 +54,13 @@ function drawBackground(){
     }
   }
   ctx.drawImage(bgCache,0,0,VW,VH);
+
+  // Capillaries used to be baked into bgCache as static lines. Now drawn live
+  // each frame so they can pulse with the Body's heartbeat (hbBeat, same
+  // signal that scales the core in drawCore) — the whole arena reads as
+  // living tissue instead of a painted backdrop.
+  drawVeins(hbBeat||0);
+
   if(!ambientSeeds){
     ambientSeeds=[];
     for(let i=0;i<9;i++)ambientSeeds.push({sx:rand(0,1000),sy:rand(0,1000),r:rand(26,64),hue:i%2});
@@ -81,6 +76,155 @@ function drawBackground(){
     }
     ctx.globalAlpha=1;
   }
+  drawFloatingCells();
+}
+
+/* Capillary network radiating from the Body core. Redrawn live (not baked)
+   so width + brightness can pulse on `hbBeat` — a vein "throb" that travels
+   outward on each beat, same cadence as the core's own pulse. */
+function drawVeins(hbBeat){
+  if(!veinSeeds){
+    veinSeeds=[];
+    const c=worldCore();
+    for(let i=0;i<14;i++){
+      const a=(i/14)*Math.PI*2+0.3;
+      const midR=Math.max(VW,VH)*0.33;
+      veinSeeds.push({
+        a,w:rand(6,13),
+        x0:c.x+Math.cos(a)*coreRadius()*1.2,y0:c.y+Math.sin(a)*coreRadius()*1.2,
+        cx:c.x+Math.cos(a+0.35)*midR,cy:c.y+Math.sin(a+0.35)*midR,
+        x1:c.x+Math.cos(a-0.15)*Math.max(VW,VH)*0.78,y1:c.y+Math.sin(a-0.15)*Math.max(VW,VH)*0.78,
+        phase:rand(0,1)
+      });
+    }
+  }
+  const beat=REDUCED?0:hbBeat;
+  ctx.lineCap='round';
+  for(const v of veinSeeds){
+    const glow=0.05+beat*0.09;
+    ctx.strokeStyle=`rgba(127,214,255,${glow.toFixed(3)})`;
+    ctx.lineWidth=v.w*(1+beat*0.22);
+    ctx.beginPath();
+    ctx.moveTo(v.x0,v.y0);
+    ctx.quadraticCurveTo(v.cx,v.cy,v.x1,v.y1);
+    ctx.stroke();
+  }
+  // a brighter pulse-of-light travels outward along each vein on the beat —
+  // small in cost (14 short strokes) but reads as blood actually moving
+  if(!REDUCED&&beat>0.15){
+    const travel=beat; // 0→1 across the beat window, reused as the travel fraction
+    ctx.lineCap='round';
+    for(const v of veinSeeds){
+      const tt=clamp(travel+v.phase*0.001,0,1);
+      const px=lerp(lerp(v.x0,v.cx,tt),lerp(v.cx,v.x1,tt),tt);
+      const py=lerp(lerp(v.y0,v.cy,tt),lerp(v.cy,v.y1,tt),tt);
+      ctx.strokeStyle=`rgba(200,255,240,${(beat*0.35).toFixed(3)})`;
+      ctx.lineWidth=v.w*0.55;
+      ctx.beginPath();
+      ctx.moveTo(px-Math.cos(v.a)*10,py-Math.sin(v.a)*10);
+      ctx.lineTo(px+Math.cos(v.a)*10,py+Math.sin(v.a)*10);
+      ctx.stroke();
+    }
+  }
+}
+
+/* Small free-floating background cells — lazily wandering organelle-like
+   blobs well behind the play layer (drawn before entities, low alpha, no
+   collision). Pure decoration: makes the tissue read as alive even in a
+   quiet moment between spawns. */
+function drawFloatingCells(){
+  if(REDUCED||COMPACT)return; // same budget call as the ambient glow drift above
+  if(!floatCells){
+    floatCells=[];
+    for(let i=0;i<7;i++){
+      floatCells.push({
+        sx:rand(0,1),sy:rand(0,1),
+        r:rand(9,20),
+        speed:rand(0.008,0.02),
+        drift:rand(0,1000),
+        hue:choice(['#8fe36a','#7fd6ff','#ffd166','#c084fc']),
+        spin:rand(-0.3,0.3)
+      });
+    }
+  }
+  const t=performance.now()/1000;
+  for(const fc of floatCells){
+    const x=((Math.sin(t*fc.speed+fc.drift)*0.5+0.5))*VW*1.1-VW*0.05;
+    const y=((Math.cos(t*fc.speed*0.7+fc.drift*1.3)*0.5+0.5))*VH*1.1-VH*0.05;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(t*fc.spin);
+    ctx.globalAlpha=0.16;
+    ctx.fillStyle=fc.hue;
+    ctx.beginPath();
+    const pts=6;
+    for(let i=0;i<=pts;i++){
+      const a=(i/pts)*Math.PI*2;
+      const rr=fc.r*(1+Math.sin(a*2+t*0.6)*0.15);
+      const px=Math.cos(a)*rr,py=Math.sin(a)*rr;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();ctx.fill();
+    // faint nucleus fleck sells "cell" over "blob"
+    ctx.globalAlpha=0.22;
+    ctx.beginPath();ctx.arc(fc.r*0.15,-fc.r*0.1,fc.r*0.32,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+
+/* Large drifting organism silhouettes passing OVER the arena — occasional,
+   slow, translucent shapes (bigger than any real enemy) that cross the play
+   field and fade out, like something large swimming past overhead. Purely
+   atmospheric: no collision, no gameplay effect. Called late in the render
+   order so it sits above entities, same visual idea as a cloud shadow. */
+function drawDriftingOrganisms(dt){
+  if(REDUCED)return;
+  if(!driftOrganisms)driftOrganisms=[];
+  // spawn a new one occasionally
+  if(!COMPACT&&Math.random()<dt*0.045&&driftOrganisms.length<2){
+    const a=rand(0,Math.PI*2);
+    const speed=rand(14,26);
+    const R=Math.max(VW,VH)*0.75;
+    const c=worldCore();
+    driftOrganisms.push({
+      x:c.x+Math.cos(a)*R,y:c.y+Math.sin(a)*R,
+      vx:-Math.cos(a)*speed,vy:-Math.sin(a)*speed,
+      r:rand(70,130),
+      life:0,maxLife:rand(9,14),
+      wob:rand(0,1000),
+      legs:randi(5,8),
+      hue:choice(['#3ee8c8','#7fd6ff','#c084fc'])
+    });
+  }
+  for(let i=driftOrganisms.length-1;i>=0;i--){
+    const o=driftOrganisms[i];
+    o.life+=dt;
+    o.x+=o.vx*dt;o.y+=o.vy*dt;
+    const fadeIn=clamp(o.life/1.5,0,1);
+    const fadeOut=clamp((o.maxLife-o.life)/1.5,0,1);
+    const a=Math.min(fadeIn,fadeOut)*0.09;
+    if(o.life>=o.maxLife){driftOrganisms.splice(i,1);continue;}
+    if(a<=0)continue;
+    const t=performance.now()/1000;
+    ctx.save();
+    ctx.translate(o.x,o.y);
+    ctx.globalAlpha=a;
+    ctx.fillStyle=o.hue;
+    // soft many-legged silhouette, like a jellyfish/plankton seen from below
+    ctx.beginPath();
+    for(let j=0;j<=o.legs*2;j++){
+      const ang=(j/(o.legs*2))*Math.PI*2;
+      const rr=o.r*(j%2===0?1:0.72)*(1+Math.sin(ang*3+t*0.8+o.wob)*0.06);
+      const px=Math.cos(ang)*rr,py=Math.sin(ang)*rr*0.8; // slightly flattened
+      j===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();ctx.fill();
+    ctx.globalAlpha=a*1.6;
+    ctx.beginPath();ctx.arc(0,0,o.r*0.22,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
 }
 
 function drawPerimeter(){

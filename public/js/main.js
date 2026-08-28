@@ -127,7 +127,7 @@ function render(view,dtReal){
     ctx.translate(vOffX,vOffY);
     ctx.scale(vScale,vScale);
     if(FX.shake>0.2&&!REDUCED)ctx.translate(rand(-1,1)*FX.shake*0.4,rand(-1,1)*FX.shake*0.4);
-    drawBackground();
+    drawBackground(hbBeat);
     if(view){
       drawTrails(view);
       drawPerimeter();
@@ -144,6 +144,7 @@ function render(view,dtReal){
       drawPerimeter();
       drawCore({bodyHp:1000,bodyHpMax:1000},hbBeat);
     }
+    drawDriftingOrganisms(dtReal);
     drawParticles();
     drawMotes();
     drawPopups();
