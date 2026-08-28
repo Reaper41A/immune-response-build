@@ -14,7 +14,7 @@
 
 function drawBeastIcon(canvas,defKey,def){
   const dpr=Math.min(window.devicePixelRatio||1,2);
-  const size=56;
+  const size=48; // must match .beast-icon's CSS width/height in index.html
   canvas.width=size*dpr;canvas.height=size*dpr;
   canvas.style.width=size+'px';canvas.style.height=size+'px';
   const c=canvas.getContext('2d');
@@ -22,11 +22,11 @@ function drawBeastIcon(canvas,defKey,def){
   c.clearRect(0,0,size,size);
   c.save();
   c.translate(size/2,size/2);
-  // Normalize every icon to roughly the same on-screen footprint (~20px
+  // Normalize every icon to roughly the same on-screen footprint (~17px
   // radius) regardless of the enemy's actual world-space radius — small
   // fry like the Worm (r10) would otherwise render as a speck, and bosses
   // (r30+) would blow out past the canvas edge.
-  const scale=20/Math.max(6,def.radius||14);
+  const scale=17/Math.max(6,def.radius||14);
   c.scale(scale,scale);
   const r=def.radius||14;
   const t=1.3; // frozen "mid-animation" phase — reads clearer than t=0
