@@ -24,6 +24,45 @@ function hexToRgba(hex,a){
   return `rgba(${r},${g},${b},${a})`;
 }
 
+/* ---------------------------------------------------------- pseudo-3D shading
+   Every enemy/player shape is a flat canvas fill, which reads flat and a bit
+   cheap. This gives any already-filled path a light "glossy sphere" pass —
+   a soft highlight toward the light source, a darker rim toward the shadow
+   side, and a crisp specular fleck — using ONLY the path already on `ctx`
+   (caller must fill the path with the base color, then call this while the
+   SAME path is still current, then stroke/restore as before). Cheap: two
+   radial gradients + one clip, no per-shape sprite caching needed since
+   these are small (~20-50px) paths drawn a few dozen times a frame.
+   `r` = the shape's approximate radius, used to scale offsets/sizes. */
+function shade3D(ctxr,r,opts){
+  const o=opts||{};
+  const lx=o.lx!=null?o.lx:-r*0.32, ly=o.ly!=null?o.ly:-r*0.38; // light upper-left
+  ctxr.save();
+  ctxr.clip();
+  // ambient occlusion — darker crescent toward lower-right (away from light)
+  const shG=ctxr.createRadialGradient(r*0.4,r*0.46,r*0.15,r*0.4,r*0.46,r*1.5);
+  shG.addColorStop(0,'rgba(0,0,0,0.32)');
+  shG.addColorStop(0.7,'rgba(0,0,0,0.1)');
+  shG.addColorStop(1,'rgba(0,0,0,0)');
+  ctxr.fillStyle=shG;
+  ctxr.fillRect(-r*2,-r*2,r*4,r*4);
+  // core highlight — soft bright patch toward the light
+  const hiG=ctxr.createRadialGradient(lx,ly,0,lx,ly,r*1.3);
+  hiG.addColorStop(0,'rgba(255,255,255,'+(o.hiAlpha!=null?o.hiAlpha:0.55)+')');
+  hiG.addColorStop(0.35,'rgba(255,255,255,'+(o.hiAlpha!=null?o.hiAlpha*0.35:0.18)+')');
+  hiG.addColorStop(1,'rgba(255,255,255,0)');
+  ctxr.fillStyle=hiG;
+  ctxr.fillRect(-r*2,-r*2,r*4,r*4);
+  // tight specular fleck — the "wet highlight" that sells glossy/3D
+  if(o.specular!==false){
+    ctxr.beginPath();
+    ctxr.arc(lx*1.15,ly*1.15,Math.max(1.2,r*0.16),0,Math.PI*2);
+    ctxr.fillStyle='rgba(255,255,255,0.65)';
+    ctxr.fill();
+  }
+  ctxr.restore();
+}
+
 /* ---------------------------------------------------------------- canvas */
 const canvas=$('gameCanvas');
 const ctx=canvas.getContext('2d',{alpha:false}); // opaque → compositor skips per-frame blending (big mobile heat win)

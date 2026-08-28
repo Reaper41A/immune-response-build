@@ -57,9 +57,11 @@ function drawEnemies(view){
       case'antigenCluster':
         for(let i=0;i<4;i++){
           const a=i/4*Math.PI*2+t;
-          ctx.beginPath();
-          ctx.arc(Math.cos(a)*def.radius*0.42,Math.sin(a)*def.radius*0.42,def.radius*0.5,0,Math.PI*2);
-          ctx.fill();
+          const px=Math.cos(a)*def.radius*0.42,py=Math.sin(a)*def.radius*0.42,pr=def.radius*0.5;
+          ctx.save();ctx.translate(px,py);
+          ctx.beginPath();ctx.arc(0,0,pr,0,Math.PI*2);ctx.fill();
+          shade3D(ctx,pr,{hiAlpha:0.45});
+          ctx.restore();
         }
         break;
       case'biofilmWall':
@@ -84,9 +86,11 @@ function drawEnemies(view){
         blobPath(def.radius,t*2.5,0.3);
         ctx.fillStyle='#ff4d6d';
         ctx.beginPath();ctx.arc(0,0,def.radius*0.35,0,Math.PI*2);ctx.fill();
+        shade3D(ctx,def.radius*0.35,{hiAlpha:0.5});
         break;
       default:
         ctx.beginPath();ctx.arc(0,0,def.radius,0,Math.PI*2);ctx.fill();
+        shade3D(ctx,def.radius);
     }
 
     // elite ring + glyph
@@ -137,6 +141,7 @@ function drawMimicDisguised(en,t,victim){
   ctx.globalAlpha*=0.94;
   ctx.fillStyle=color;
   ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();
+  shade3D(ctx,13);
   ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1.5;ctx.stroke();
   ctx.restore();
   ctx.fillStyle='rgba(255,255,255,0.75)';
@@ -154,6 +159,7 @@ function blobPath(r,t,irr=0.12){
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   }
   ctx.closePath();ctx.fill();
+  shade3D(ctx,r);
 }
 function spikyPath(r,spikes,t,inner=0.55){
   ctx.beginPath();
@@ -164,6 +170,7 @@ function spikyPath(r,spikes,t,inner=0.55){
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   }
   ctx.closePath();ctx.fill();
+  shade3D(ctx,r,{hiAlpha:0.4,specular:false}); // spikes read busy w/ a hard fleck; keep it soft
 }
 function hexPath(r){
   ctx.beginPath();
@@ -173,6 +180,7 @@ function hexPath(r){
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   }
   ctx.closePath();ctx.fill();
+  shade3D(ctx,r,{hiAlpha:0.5});
   ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1.5;ctx.stroke();
 }
 function cloudPath(r,t){
@@ -182,6 +190,7 @@ function cloudPath(r,t){
   ctx.arc(r*0.55,r*0.1,r*0.48,0,Math.PI*2);
   ctx.arc(0,r*0.28,r*0.5,0,Math.PI*2);
   ctx.fill();
+  shade3D(ctx,r,{ly:-r*0.55,hiAlpha:0.5,specular:false});
   ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;
   ctx.beginPath();ctx.arc(0,0,r*(1.15+((t%1)<0.5?(t%1):1-(t%1))*0.15),0,Math.PI*2);ctx.stroke();
 }
@@ -191,6 +200,7 @@ function dartPath(r,t){
   ctx.beginPath();
   ctx.moveTo(r*1.3,0);ctx.lineTo(-r*0.7,-r*0.75);ctx.lineTo(-r*0.3,0);ctx.lineTo(-r*0.7,r*0.75);
   ctx.closePath();ctx.fill();
+  shade3D(ctx,r,{lx:r*0.15,ly:-r*0.25});
 }
 function drip(r,t,seed){
   ctx.fillStyle='rgba(138,154,91,0.6)';
@@ -208,6 +218,7 @@ function roundRect(x,y,w,h,r){
   ctx.arcTo(x,y+h,x,y,r);
   ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();ctx.fill();
+  shade3D(ctx,Math.max(w,h)*0.5,{lx:x+w*0.28,ly:y+h*0.22,hiAlpha:0.35,specular:false});
 }
 
 /* ---------------------------------------------------------------- players */
@@ -259,6 +270,7 @@ function drawPlayers(view,firingRingFor){
     }
     ctx.fillStyle=p.col;
     ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
+    shade3D(ctx,14,{hiAlpha:0.6});
     ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':'rgba(255,255,255,0.65)';
     ctx.lineWidth=1.5;ctx.stroke();
     // facing nub

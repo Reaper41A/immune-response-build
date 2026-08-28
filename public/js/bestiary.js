@@ -42,6 +42,36 @@ function drawBeastIcon(canvas,defKey,def){
 
   c.fillStyle=def.color;
 
+  // static-icon counterpart to entities.js's shade3D — same glossy-sphere
+  // look (highlight toward upper-left, AO shadow lower-right, spec fleck),
+  // just called against this icon's own throwaway context instead of the
+  // shared gameplay `ctx`, so the bestiary matches what you see mid-run.
+  function shade(rr,opts){
+    const oo=opts||{};
+    const lx=oo.lx!=null?oo.lx:-rr*0.32, ly=oo.ly!=null?oo.ly:-rr*0.38;
+    c.save();
+    c.clip();
+    const shG=c.createRadialGradient(rr*0.4,rr*0.46,rr*0.15,rr*0.4,rr*0.46,rr*1.5);
+    shG.addColorStop(0,'rgba(0,0,0,0.32)');
+    shG.addColorStop(0.7,'rgba(0,0,0,0.1)');
+    shG.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=shG;
+    c.fillRect(-rr*2,-rr*2,rr*4,rr*4);
+    const hiG=c.createRadialGradient(lx,ly,0,lx,ly,rr*1.3);
+    hiG.addColorStop(0,'rgba(255,255,255,'+(oo.hiAlpha!=null?oo.hiAlpha:0.55)+')');
+    hiG.addColorStop(0.35,'rgba(255,255,255,'+(oo.hiAlpha!=null?oo.hiAlpha*0.35:0.18)+')');
+    hiG.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=hiG;
+    c.fillRect(-rr*2,-rr*2,rr*4,rr*4);
+    if(oo.specular!==false){
+      c.beginPath();
+      c.arc(lx*1.15,ly*1.15,Math.max(1.2,rr*0.16),0,Math.PI*2);
+      c.fillStyle='rgba(255,255,255,0.65)';
+      c.fill();
+    }
+    c.restore();
+  }
+
   function blob(rr,irr){
     const pts=8;
     c.beginPath();
@@ -52,6 +82,7 @@ function drawBeastIcon(canvas,defKey,def){
       i===0?c.moveTo(x,y):c.lineTo(x,y);
     }
     c.closePath();c.fill();
+    shade(rr);
   }
   function spiky(rr,spikes,inner){
     c.beginPath();
@@ -62,6 +93,7 @@ function drawBeastIcon(canvas,defKey,def){
       i===0?c.moveTo(x,y):c.lineTo(x,y);
     }
     c.closePath();c.fill();
+    shade(rr,{hiAlpha:0.4,specular:false});
   }
   function hexP(rr){
     c.beginPath();
@@ -71,6 +103,7 @@ function drawBeastIcon(canvas,defKey,def){
       i===0?c.moveTo(x,y):c.lineTo(x,y);
     }
     c.closePath();c.fill();
+    shade(rr,{hiAlpha:0.5});
     c.strokeStyle='rgba(255,255,255,0.4)';c.lineWidth=1.5;c.stroke();
   }
   function cloud(rr){
@@ -80,11 +113,13 @@ function drawBeastIcon(canvas,defKey,def){
     c.arc(rr*0.55,rr*0.1,rr*0.48,0,Math.PI*2);
     c.arc(0,rr*0.28,rr*0.5,0,Math.PI*2);
     c.fill();
+    shade(rr,{ly:-rr*0.55,hiAlpha:0.5,specular:false});
   }
   function dart(rr){
     c.beginPath();
     c.moveTo(rr*1.3,0);c.lineTo(-rr*0.7,-rr*0.75);c.lineTo(-rr*0.3,0);c.lineTo(-rr*0.7,rr*0.75);
     c.closePath();c.fill();
+    shade(rr,{lx:rr*0.15,ly:-rr*0.25});
   }
   function roundRectF(x,y,w,h,rad){
     c.beginPath();
@@ -94,6 +129,7 @@ function drawBeastIcon(canvas,defKey,def){
     c.arcTo(x,y+h,x,y,rad);
     c.arcTo(x,y,x+w,y,rad);
     c.closePath();c.fill();
+    shade(Math.max(w,h)*0.5,{lx:x+w*0.28,ly:y+h*0.22,hiAlpha:0.35,specular:false});
   }
 
   switch(defKey){
@@ -117,9 +153,11 @@ function drawBeastIcon(canvas,defKey,def){
     case'antigenCluster':
       for(let i=0;i<4;i++){
         const a=i/4*Math.PI*2;
-        c.beginPath();
-        c.arc(Math.cos(a)*r*0.42,Math.sin(a)*r*0.42,r*0.5,0,Math.PI*2);
-        c.fill();
+        const px=Math.cos(a)*r*0.42,py=Math.sin(a)*r*0.42,pr=r*0.5;
+        c.save();c.translate(px,py);
+        c.beginPath();c.arc(0,0,pr,0,Math.PI*2);c.fill();
+        shade(pr,{hiAlpha:0.45});
+        c.restore();
       }
       break;
     case'worm_seg':
@@ -148,12 +186,14 @@ function drawBeastIcon(canvas,defKey,def){
       blob(r,0.3);
       c.fillStyle='#ff4d6d';
       c.beginPath();c.arc(0,0,r*0.35,0,Math.PI*2);c.fill();
+      shade(r*0.35,{hiAlpha:0.5});
       break;
     case'parasite':case'megaVirus':case'mutatedFungus':case'parasiteQueen':
       spiky(r,12,0.75);
       break;
     default:
       c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();
+      shade(r);
   }
 
   // elite-style outline ring for bosses, echoes the in-run boss treatment
