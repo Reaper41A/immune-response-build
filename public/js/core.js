@@ -41,7 +41,15 @@ function resize(){
   const rect=wrap.getBoundingClientRect();
   DPR=Math.min(window.devicePixelRatio||1,2);
   W=Math.max(1,Math.round(rect.width));H=Math.max(1,Math.round(rect.height));
-  COMPACT=Math.min(W,H)<520;
+  // Phone-class detection uses the SHORT side of the device, not the short
+  // side of the current orientation — a phone rotated to landscape still
+  // has a small physical screen, but its *height* in that orientation
+  // (~360-420px) used to trip the old `min(W,H)<520` test and, combined
+  // with a tall fixed VH, shrank every on-screen entity to a fraction of
+  // its intended size. screen.width/height are orientation-stable so this
+  // reads the same phone in portrait or landscape.
+  const shortSide=Math.min(screen.width||W,screen.height||H);
+  COMPACT=shortSide<560;
   if(!resize.init){resize.init=true;RES=COMPACT?0.85:1;} // phones start cooler, PERF adapts from there
   canvas.width=Math.max(1,Math.round(W*DPR*RES));
   canvas.height=Math.max(1,Math.round(H*DPR*RES));
@@ -54,11 +62,15 @@ function fitWorld(){
   bgCache=null;
 }
 function initWorld(){
-  const ar=clamp(W/Math.max(1,H),0.62,2.2);
-  // phones get a physically smaller arena so the projection scale (and thus
-  // every entity on screen) stays readable instead of shrinking into the distance
-  VH=COMPACT?700:900;
-  VW=Math.round(clamp(VH*ar,COMPACT?500:700,1760));
+  const ar=clamp(W/Math.max(1,H),0.62,2.6);
+  // Phone landscape is the common phone play orientation (fullscreen +
+  // orientation-lock target it below) — give it its own, shorter VH so the
+  // projection scale stays close to the portrait-phone scale instead of
+  // stretching a tall 700-900 world across a ~380px-tall viewport. This is
+  // what made players/enemies/HUD read as "too small" in landscape.
+  const landscapePhone=COMPACT&&W>H;
+  VH=landscapePhone?460:(COMPACT?700:900);
+  VW=Math.round(clamp(VH*ar,COMPACT?500:700,1900));
   fitWorld();
 }
 window.addEventListener('resize',resize);
@@ -96,6 +108,35 @@ function exitGameFullscreen(){
     if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
   }catch(_){}
 }
+function isGameFullscreen(){
+  return !!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
+}
+/* Browsers silently drop fullscreen on their own (backgrounding, a system
+   dialog, some Android chrome gestures) and there's no way to re-request it
+   without a fresh user gesture — so instead of trying to force it back
+   automatically, surface a small always-available button the moment we're
+   in a run but NOT fullscreen. Tapping it is a genuine user gesture, so the
+   request succeeds. On browsers with no Fullscreen API at all (iOS Safari
+   without "Add to Home Screen"), the button hides itself instead of
+   pretending to do something impossible. */
+function fullscreenApiAvailable(){
+  const el=document.documentElement;
+  return !!(el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen);
+}
+function updateFullscreenBtn(){
+  const btn=$('fullscreenBtn');
+  if(!btn)return;
+  if(!fullscreenApiAvailable()){btn.classList.add('hidden');return;}
+  const inRunNow=App.screen==='playing'||App.screen==='pause'||App.screen==='draft';
+  if(!inRunNow){btn.classList.add('hidden');return;}
+  btn.classList.remove('hidden');
+  const fs=isGameFullscreen();
+  btn.textContent=fs?'⛶':'⛶';
+  btn.classList.toggle('suggest',!fs);
+  btn.setAttribute('data-tip',fs?'Exit fullscreen':'Hide browser bar / go fullscreen');
+}
+['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange']
+  .forEach(ev=>document.addEventListener(ev,()=>updateFullscreenBtn()));
 
 /* World-space helpers — pure functions of the FROZEN virtual size. */
 function worldCore(){return{x:VW*0.5,y:VH*0.52};}

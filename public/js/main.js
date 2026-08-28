@@ -338,6 +338,11 @@ function wireUi(){
   });
   $('soundBtn').textContent=AudioSys.muted?'🔇':'🔊';
 
+  $('fullscreenBtn').addEventListener('click',()=>{
+    if(isGameFullscreen())exitGameFullscreen();
+    else requestGameFullscreen();
+  });
+
   window.addEventListener('keydown',e=>{
     if(App.screen==='draft'){
       if(['1','2','3'].includes(e.key)){
@@ -353,19 +358,7 @@ function wireUi(){
     if(document.hidden&&App.screen==='playing'&&App.mode==='solo')togglePause();
   });
 
-  // bestiary
-  const bg=$('bestiaryGrid');
-  const entries=[...Object.entries(ENEMY_DEFS).filter(([k])=>k!=='spore'),
-    ['megaVirus',{name:'Mega Virus',color:'#ff4d6d',tell:'BOSS — every 5th wave.'}],
-    ['mutatedFungus',{name:'Mutated Fungus',color:'#6fae5f',tell:'BOSS — every 5th wave.'}],
-    ['parasiteQueen',{name:'Parasite Queen',color:'#ff9f5a',tell:'BOSS — every 5th wave.'}]];
-  for(const[,d]of entries){
-    const el=document.createElement('div');
-    el.className='beast';
-    el.innerHTML=`<div class="beast-swatch" style="color:${d.color}"></div>`+
-      `<div><div class="beast-name">${d.name}</div><div class="beast-desc">${d.tell}</div></div>`;
-    bg.appendChild(el);
-  }
+  buildBestiaryGrid();
 
   resize();
   showScreen('screenSplash');

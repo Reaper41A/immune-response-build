@@ -41,8 +41,8 @@
   --font-ui:'Segoe UI',system-ui,-apple-system,sans-serif;
   --font-mono:'Cascadia Mono','SF Mono',Consolas,monospace;
 
-  --fire-btn-size:16vmin; --fire-btn-min:64px; --fire-btn-max:88px;
-  --ability-btn-size:13vmin; --ability-btn-min:54px; --ability-btn-max:72px;
+  --fire-btn-size:16vmin; --fire-btn-min:72px; --fire-btn-max:96px;
+  --ability-btn-size:13vmin; --ability-btn-min:60px; --ability-btn-max:78px;
   --btn-gap:22px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -57,7 +57,7 @@ button{font-family:var(--font-ui);}
 :focus-visible{outline:2px solid var(--antibody);outline-offset:2px;}
 
 #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
-#gameWrap{position:relative;width:100%;height:100%;max-width:1500px;max-height:940px;}
+#gameWrap{position:relative;width:100%;height:100%;max-width:2400px;max-height:1400px;}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 
 /* ------------------------------------------------------------- screens */
@@ -243,6 +243,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   font-size:14px;display:flex;align-items:center;justify-content:center;transition:background .15s ease;
 }
 .icon-btn:hover{background:rgba(26,44,68,.9);}
+#fullscreenBtn.suggest{border-color:var(--plasma);color:var(--plasma);animation:fsPulse 1.8s ease-in-out infinite;}
+@keyframes fsPulse{0%,100%{box-shadow:0 0 0 0 rgba(62,232,200,.45)}50%{box-shadow:0 0 0 7px rgba(62,232,200,0)}}
 
 .organ-icons{display:flex;gap:5px;}
 .organ-icon{
@@ -274,17 +276,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 @keyframes calloutIn{from{opacity:0;transform:translateX(-9px)}to{opacity:1;transform:translateX(0)}}
 @keyframes calloutOut{to{opacity:0;transform:translateX(-6px)}}
 
-.squad-panel{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:14px;z-index:21;display:flex;flex-direction:column;gap:6px;}
+.squad-panel{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:14px;z-index:21;display:flex;flex-direction:column;gap:7px;}
 .squad-mate{
-  display:flex;align-items:center;gap:7px;background:rgba(10,18,32,.72);border:1px solid var(--line);
-  border-radius:11px;padding:5px 9px 5px 6px;font-family:var(--font-mono);font-size:10px;backdrop-filter:blur(3px);
+  display:flex;align-items:center;gap:8px;background:rgba(10,18,32,.72);border:1px solid var(--line);
+  border-radius:12px;padding:6px 11px 6px 8px;font-family:var(--font-mono);font-size:11px;backdrop-filter:blur(3px);
 }
 .squad-mate.you{border-color:rgba(255,62,200,.45);}
-.squad-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.squad-name{max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.squad-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.squad-name{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .squad-name.you{color:var(--you);font-weight:700;}
-.squad-down{color:#ff8ea0;font-size:9px;}
-.squad-hp-track{width:46px;height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;}
+.squad-down{color:#ff8ea0;font-size:10px;}
+.squad-hp-track{width:52px;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;}
 .squad-hp-fill{height:100%;border-radius:3px;transition:width .3s ease;}
 
 .weapon-hud{
@@ -436,14 +438,25 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
      genuinely overflows this — normal 3-card drafts never will. */
   max-height:calc(100vh - 64px - env(safe-area-inset-top) - 140px);
   overflow-y:auto;
-  background:var(--membrane);border-radius:22px;padding:20px;border:1px solid var(--line);
+  background:var(--membrane);border-radius:22px;padding:22px 24px;border:1px solid var(--line);
   animation:popIn .35s ease;
   margin:0 auto; /* belt-and-suspenders horizontal centering under flex */
 }
+/* Landscape phones/tablets have plenty of spare width but a squeezed
+   height — the old fixed 560px cap forced every card into a narrow
+   column and, combined with the tight max-height above, crushed each
+   card's padding/line-height until text wrapped awkwardly. Widening the
+   panel in landscape and letting the cards run 2-up gives each card its
+   full intended size instead of shrinking to fit. */
+@media (orientation:landscape) and (max-height:640px){
+  .draft-panel{width:min(92vw,860px);max-height:calc(100vh - 40px - env(safe-area-inset-top));padding:18px 22px;}
+  .upgrade-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;}
+  .draft-header{margin-bottom:2px;}
+}
 .draft-header{text-align:center;margin-bottom:4px;}
 .draft-kicker{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin-bottom:4px;}
-.draft-title{font-size:21px;font-weight:800;color:var(--gold);}
-.draft-sub{font-family:var(--font-mono);font-size:10.5px;color:var(--dim);margin-top:4px;line-height:1.5;}
+.draft-title{font-size:22px;font-weight:800;color:var(--gold);}
+.draft-sub{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:4px;line-height:1.5;}
 .draft-timer-row{display:flex;align-items:center;gap:10px;margin:12px 0 14px;}
 .draft-timer-track{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
 .draft-timer-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--infect));}
@@ -453,33 +466,33 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
    entirely rather than show a fake full/frozen one. */
 .draft-panel.no-timer .draft-timer-row{display:none;}
 .draft-timer-num.urgent{color:#ff8ea0;}
-.summary-row{display:flex;justify-content:space-around;margin-bottom:14px;font-family:var(--font-mono);font-size:10px;color:var(--dim);}
-.summary-row b{color:var(--tissue);display:block;font-size:15px;font-family:var(--font-ui);margin-top:1px;}
-.upgrade-list{display:flex;flex-direction:column;gap:8px;}
+.summary-row{display:flex;justify-content:space-around;margin-bottom:16px;font-family:var(--font-mono);font-size:10.5px;color:var(--dim);}
+.summary-row b{color:var(--tissue);display:block;font-size:17px;font-family:var(--font-ui);margin-top:2px;}
+.upgrade-list{display:flex;flex-direction:column;gap:10px;}
 .upgrade-card{
-  display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  border-radius:14px;padding:12px;cursor:pointer;transition:all .14s ease;position:relative;overflow:hidden;
-  border-left:3px solid var(--oc,var(--plasma));
+  display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:15px;padding:14px 15px;cursor:pointer;transition:all .14s ease;position:relative;overflow:hidden;
+  border-left:3px solid var(--oc,var(--plasma));min-height:64px;
 }
 .upgrade-card:hover{background:rgba(255,255,255,.07);transform:translateX(2px);}
 .upgrade-card.picked{border-color:var(--oc,var(--plasma));background:color-mix(in srgb,var(--oc,var(--plasma)) 9%,transparent);box-shadow:0 0 18px -6px var(--oc,var(--plasma));}
 .upgrade-card.disabled{opacity:.42;pointer-events:auto;filter:saturate(.4);}
 .upgrade-card .num-key{
-  position:absolute;top:6px;right:8px;font-family:var(--font-mono);font-size:8.5px;color:rgba(255,255,255,.3);
+  position:absolute;top:7px;right:9px;font-family:var(--font-mono);font-size:9px;color:rgba(255,255,255,.3);
   border:1px solid rgba(255,255,255,.16);border-radius:4px;padding:0 4px;
 }
-.upgrade-icon{width:40px;height:40px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:rgba(255,255,255,.06);}
+.upgrade-icon{width:46px;height:46px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,.06);}
 .upgrade-body{flex:1;min-width:0;}
-.upgrade-name{font-weight:700;font-size:13.5px;}
-.upgrade-desc{font-family:var(--font-mono);font-size:10.5px;color:var(--dim);margin-top:2px;line-height:1.45;}
-.upgrade-cost{font-family:var(--font-mono);font-size:12px;color:var(--plasma);font-weight:700;white-space:nowrap;}
-.upgrade-cost.cant{color:var(--infect);font-size:9.5px;}
-.votes-row{position:absolute;bottom:4px;right:12px;display:flex;gap:3px;align-items:center;}
+.upgrade-name{font-weight:700;font-size:14.5px;}
+.upgrade-desc{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:3px;line-height:1.5;}
+.upgrade-cost{font-family:var(--font-mono);font-size:13px;color:var(--plasma);font-weight:700;white-space:nowrap;}
+.upgrade-cost.cant{color:var(--infect);font-size:10px;}
+.votes-row{position:absolute;bottom:6px;right:14px;display:flex;gap:3px;align-items:center;}
 .vote-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 5px currentColor;}
 .vote-label{font-family:var(--font-mono);font-size:8px;color:var(--dim);margin-right:2px;}
 .draft-actions{display:flex;gap:10px;margin-top:15px;}
 #btnSkipDraft.picked{border-color:var(--plasma);color:var(--plasma);background:rgba(62,232,200,.12);}
-.draft-note{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);text-align:center;margin-top:10px;line-height:1.5;}
+.draft-note{font-family:var(--font-mono);font-size:10px;color:var(--dim);text-align:center;margin-top:10px;line-height:1.55;}
 
 /* ------------------------------------------------------------- howto */
 .howto-screen{width:min(94vw,680px);max-height:84vh;overflow-y:auto;padding:4px 2px 12px;}
@@ -494,14 +507,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .howto-title{font-size:15px;font-weight:800;color:var(--gold);margin-bottom:4px;}
 .howto-body{font-size:12.5px;line-height:1.6;color:var(--dim);}
 .howto-body b{color:var(--tissue);}
-.bestiary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px;}
+.bestiary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;margin-top:8px;}
 .beast{
-  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:11px;padding:9px 10px;
-  display:flex;gap:9px;align-items:center;
+  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:10px 11px;
+  display:flex;gap:11px;align-items:center;
 }
-.beast-swatch{width:16px;height:16px;border-radius:50%;flex-shrink:0;box-shadow:0 0 8px currentColor;background:currentColor;}
-.beast-name{font-size:11px;font-weight:700;line-height:1.2;}
-.beast-desc{font-family:var(--font-mono);font-size:8.8px;color:var(--dim);line-height:1.35;margin-top:1px;}
+.beast-icon{width:56px;height:56px;flex-shrink:0;}
+.beast-name{font-size:12px;font-weight:700;line-height:1.2;}
+.beast-desc{font-family:var(--font-mono);font-size:9.2px;color:var(--dim);line-height:1.4;margin-top:2px;}
 
 /* mockup diagrams */
 .diagram-joystick{width:86px;height:86px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;}
@@ -590,6 +603,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <div class="organ-icons" id="organIcons"></div>
         <span class="ep-badge">◈ <span id="epCount">0</span></span>
         <div class="right-controls">
+          <button class="icon-btn hidden" id="fullscreenBtn" data-tip="Hide browser bar / toggle fullscreen">⛶</button>
           <button class="icon-btn" id="soundBtn" data-tip="Sound on/off">🔊</button>
           <button class="icon-btn" id="pauseBtn" data-tip="Pause / menu">❚❚</button>
         </div>
@@ -727,7 +741,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <div class="howto-figure"><div class="diagram-joystick"><div class="diagram-joystick-nub"></div></div></div>
         <div class="howto-copy">
           <div class="howto-title">1. Move</div>
-          <div class="howto-body">Drag anywhere on the <b>left half</b> of the screen like a joystick, or use <span class="kbd">WASD</span> / arrow keys on desktop.</div>
+          <div class="howto-body">On touch, drag anywhere on the <b>left half</b> of the screen like a joystick. On desktop use <span class="kbd">WASD</span> or the arrow keys.</div>
         </div>
       </div>
 
@@ -736,8 +750,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
           <div class="diagram-range"><div class="dr-ring"></div><div class="dr-foe"></div><div class="dr-me"></div></div>
         </div>
         <div class="howto-copy">
-          <div class="howto-title">2. Hold FIRE — targeting is automatic</div>
-          <div class="howto-body">Hold the red <b>FIRE</b> button (or <span class="kbd">SPACE</span> / hold mouse). The pathogen nearest to you within your weapon's range locks automatically — no aiming needed. Release fire to drop the lock, then hold again to switch targets. Each class has a different range: check the ring while firing.</div>
+          <div class="howto-title">2. Fire — targeting is automatic</div>
+          <div class="howto-body"><b>Touch:</b> drag on the <b>right half</b> of the screen — past the small dead zone your weapon fires automatically at whatever's nearest and in range. <b>Desktop:</b> hold the red <b>FIRE</b> button or <span class="kbd">SPACE</span>. Either way, no aiming is needed — release to drop the lock, engage again to pick a new target. Each class has a different range; watch the dashed ring while firing.</div>
         </div>
       </div>
 
@@ -750,7 +764,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         </div>
         <div class="howto-copy">
           <div class="howto-title">3. Use your ability</div>
-          <div class="howto-body">The blue button above FIRE (or <span class="kbd">E</span>) uses your class ability. It never blocks movement or firing — press it whenever it glows.</div>
+          <div class="howto-body"><b>Touch:</b> drag your fire-stick past the <b>outer dashed ring</b> to trigger your class ability — it fires once per drag-out. <b>Desktop:</b> press <span class="kbd">E</span>, or tap the blue button above FIRE. Abilities never block movement or firing — use it whenever it's glowing and off cooldown.</div>
         </div>
       </div>
 
@@ -863,6 +877,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <script src="js/fx.js"></script>
 <script src="js/render.js"></script>
 <script src="js/entities.js"></script>
+<script src="js/bestiary.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/input.js"></script>
 <script src="js/ui.js"></script>

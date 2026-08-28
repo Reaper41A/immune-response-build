@@ -27,7 +27,14 @@ function showScreen(id){
     if(id==='screenSplash')refreshRejoinButton();
   }else{
     App.screen='playing';
+    // Belt-and-suspenders: re-request fullscreen every time gameplay
+    // (re)starts — e.g. resuming from pause, retry, or a fresh draft →
+    // combat transition. This call is inside a function invoked from a
+    // click handler chain (Resume/Retry/etc.) so it still counts as a user
+    // gesture in the browsers that require one.
+    if(!isGameFullscreen())requestGameFullscreen();
   }
+  updateFullscreenBtn();
 }
 function setStatus(msg){$('connectStatus').innerHTML=msg?'<span style="color:#ff8ea0">'+escapeHtml(msg)+'</span>':'&nbsp;';}
 
