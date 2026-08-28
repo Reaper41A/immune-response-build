@@ -286,15 +286,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 @keyframes calloutIn{from{opacity:0;transform:translateX(-9px)}to{opacity:1;transform:translateX(0)}}
 @keyframes calloutOut{to{opacity:0;transform:translateX(-6px)}}
 
-/* Moved off the bottom-left corner — that's where the floating move
-   joystick lives, and a fixed panel sitting there visually crowded the
-   stick even though it never blocked touches. Squad status now sits as a
-   compact horizontal strip tucked under the top HUD bar, clear of both
-   the move stick (bottom-left) and fire/ability stick (bottom-right). */
+/* Lives inside .hud-top's normal flow now (as the row after debuffs), not
+   pinned to a guessed pixel offset. That guarantees it always sits right
+   below whatever the HUD stack's real height is — in portrait (where the
+   body/wave/debuff rows can wrap taller) and landscape alike — instead of
+   floating at a fixed top offset and clipping into other HUD rows or the
+   move stick whenever the layout above it changed height. */
 .squad-panel{
-  position:absolute;top:calc(84px + env(safe-area-inset-top));right:calc(3vw + 8px);
-  z-index:21;display:flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end;gap:5px;
-  max-width:min(64vw,360px);pointer-events:none;
+  display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:5px;margin-top:2px;
 }
 .squad-mate{
   display:flex;align-items:center;gap:6px;background:rgba(10,18,32,.72);border:1px solid var(--line);
@@ -307,10 +306,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .squad-down{color:#ff8ea0;font-size:9px;}
 .squad-hp-track{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;}
 .squad-hp-fill{height:100%;border-radius:3px;transition:width .3s ease;}
-/* Landscape phones have very little vertical room under the top HUD bar —
-   drop the panel below the wave/EP row instead of overlapping it. */
 @media (orientation:landscape) and (max-height:640px){
-  .squad-panel{top:calc(58px + env(safe-area-inset-top));max-width:56vw;}
   .squad-mate{padding:3px 7px 3px 6px;font-size:9px;}
   .squad-hp-track{width:30px;}
 }
@@ -635,6 +631,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         </div>
       </div>
       <div class="debuff-row" id="debuffRow"></div>
+      <div class="squad-panel" id="squadPanel"></div>
     </div>
 
     <div class="callout-feed" id="calloutFeed"></div>
@@ -648,8 +645,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="wb-main" id="wbMain">WAVE 1</div>
       <div class="wb-sub" id="wbSub"></div>
     </div>
-
-    <div class="squad-panel" id="squadPanel"></div>
 
     <div class="weapon-hud">
       <div class="weapon-name" id="weaponName">ENZYME BEAM</div>

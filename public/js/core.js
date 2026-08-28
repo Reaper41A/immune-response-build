@@ -54,7 +54,17 @@ function resize(){
   canvas.width=Math.max(1,Math.round(W*DPR*RES));
   canvas.height=Math.max(1,Math.round(H*DPR*RES));
   canvas.style.width=W+'px';canvas.style.height=H+'px';
-  fitWorld();
+  // Orientation is no longer locked, so a player can flip their phone mid-
+  // run. The arena's frozen VW/VH stays put for small viewport wobble (URL
+  // bar, keyboard) but a genuine portrait<->landscape flip re-freezes it to
+  // the new shape — otherwise "cover" fitting the old shape into the new,
+  // very different one forced a heavy crop that read as "the view is too
+  // large / zoomed in".
+  const wasLandscape=resize.lastLandscape;
+  const isLandscape=W>=H;
+  resize.lastLandscape=isLandscape;
+  if(VW&&wasLandscape!==undefined&&wasLandscape!==isLandscape)initWorld();
+  else fitWorld();
 }
 function fitWorld(){
   // Always "cover" (fill the screen edge-to-edge, cropping world edges if
@@ -64,18 +74,23 @@ function fitWorld(){
   // ratio VW/VH was frozen at (URL bar show/hide, orientation-lock failing
   // on iOS, notches) snapped the fit down to a small boxed rectangle
   // surrounded by bars. Cropping a sliver of arena is far less noticeable
-  // and never shrinks the action, so cover wins unconditionally.
-  vScale=Math.max(W/VW,H/VH);
+  // than shrinking to a box — but crop is bounded below so a bad mismatch
+  // can't zoom in so far it feels like a magnifying glass instead of a
+  // slightly tighter frame.
+  const coverScale=Math.max(W/VW,H/VH);
+  const containScale=Math.min(W/VW,H/VH);
+  // Never crop more than ~18% beyond what a plain contain fit would show.
+  vScale=Math.min(coverScale,containScale*1.18);
   vOffX=(W-VW*vScale)/2;vOffY=(H-VH*vScale)/2;
   bgCache=null;
 }
 function initWorld(){
   const ar=clamp(W/Math.max(1,H),0.62,2.6);
-  // Phone landscape is the common phone play orientation (fullscreen +
-  // orientation-lock target it below) — give it its own, shorter VH so the
-  // projection scale stays close to the portrait-phone scale instead of
-  // stretching a tall 700-900 world across a ~380px-tall viewport. This is
-  // what made players/enemies/HUD read as "too small" in landscape.
+  // Phone landscape is the common phone play orientation — give it its own,
+  // shorter VH so the projection scale stays close to the portrait-phone
+  // scale instead of stretching a tall 700-900 world across a ~380px-tall
+  // viewport. This is what made players/enemies/HUD read as "too small" in
+  // landscape. Portrait phones keep the taller default world.
   const landscapePhone=COMPACT&&W>H;
   VH=landscapePhone?460:(COMPACT?700:900);
   VW=Math.round(clamp(VH*ar,COMPACT?500:700,1900));
@@ -91,34 +106,47 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',resize);
 }
 
-/* ------------------------------------------------------- fullscreen/landscape
+/* ------------------------------------------------------- fullscreen
    Must be called synchronously from inside a user-gesture click handler —
-   browsers reject fullscreen/orientation-lock requests made any other way
-   (e.g. after an awaited network round-trip). Both APIs are best-effort:
-   iOS Safari has no orientation-lock API at all (landscape there is just a
-   hint via CSS/rotate-to-play), and fullscreen itself can be denied by the
-   user or blocked in an embedded webview — every failure here is caught
-   and swallowed so a run always starts even if neither takes effect. */
+   browsers reject fullscreen requests made any other way (e.g. after an
+   awaited network round-trip). Best-effort: fullscreen can be denied by the
+   user or blocked in an embedded webview, and every failure here is caught
+   and swallowed so a run always starts even if it doesn't take effect.
+   NOTE: this deliberately does NOT lock screen orientation. The game used
+   to force landscape on every run start, which fought players who genuinely
+   wanted to play in portrait — orientation is now left entirely up to
+   however the player is physically holding their phone, and the layout
+   (resize/fitWorld below) adapts live to whichever way that is.
+
+   Portrait fullscreen quirk: on stock Android Chrome, requestFullscreen()
+   is granted in portrait exactly the same as in landscape (there's no API-
+   level restriction), but on many devices the OS keeps a thin status-bar
+   strip reserved in portrait for cutout/notch handling and only reclaims
+   that space in landscape — so fullscreen can be "on" per the API while
+   still showing a sliver of system UI at the top in portrait. Re-issuing
+   the request is a documented, supported way to nudge this (Chrome
+   explicitly allows requestFullscreen calls tied to orientation changes,
+   not just the original click), so it's retried on every orientation flip
+   while a run is active below. */
 function requestGameFullscreen(){
   const el=document.documentElement;
   const req=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen;
-  if(!req)return;
+  if(!req){toast('Fullscreen isn\u2019t available in this browser',true);return;}
   try{
     const p=req.call(el);
-    if(p&&p.then)p.then(lockLandscape).catch(()=>{});
-    else lockLandscape(); // older vendor-prefixed APIs don't return a promise
-  }catch(_){}
+    if(p&&p.catch)p.catch(err=>toast('Fullscreen blocked: '+(err&&err.message?err.message:'browser denied it'),true));
+  }catch(err){toast('Fullscreen blocked: '+(err&&err.message?err.message:'browser denied it'),true);}
 }
-function lockLandscape(){
-  try{
-    const so=screen.orientation;
-    if(so&&so.lock)so.lock('landscape').catch(()=>{});
-  }catch(_){}
-}
+window.addEventListener('orientationchange',()=>{
+  // Re-request fullscreen shortly after a rotation while in a run — this is
+  // what actually reclaims the reserved status-bar strip some Android/Chrome
+  // builds leave in place in portrait. No-ops harmlessly if not in a run or
+  // already fullscreen.
+  setTimeout(()=>{
+    if(typeof App!=='undefined'&&App.inRun&&!isGameFullscreen())requestGameFullscreen();
+  },150);
+});
 function exitGameFullscreen(){
-  try{
-    if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();
-  }catch(_){}
   try{
     if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
   }catch(_){}
