@@ -50,26 +50,22 @@ function resize(){
   // reads the same phone in portrait or landscape.
   const shortSide=Math.min(screen.width||W,screen.height||H);
   COMPACT=shortSide<560;
-  if(!resize.init){resize.init=true;RES=COMPACT?0.85:1;} // phones start cooler, PERF adapts from there
+  if(!resize.init){resize.init=true;RES=1;} // start at full resolution; PERF backs off only if frame time actually demands it
   canvas.width=Math.max(1,Math.round(W*DPR*RES));
   canvas.height=Math.max(1,Math.round(H*DPR*RES));
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   fitWorld();
 }
 function fitWorld(){
-  // Two candidate scales: contain (letterbox, shows the whole world, may
-  // leave bars) and cover (fill the screen, may crop world edges). A pure
-  // "contain" fit is what produced visible bars any time the live aspect
-  // ratio drifted from the ratio VW/VH was frozen at (e.g. the URL bar
-  // hiding a beat after the run started). Small drifts are extremely
-  // common — a phone's chrome bar showing/hiding changes H by 50-80px
-  // without meaningfully changing the framing — so prefer "cover" and only
-  // fall back toward "contain" when the mismatch is large enough that
-  // cropping would meaningfully cut off arena content players need to see.
-  const containScale=Math.min(W/VW,H/VH);
-  const coverScale=Math.max(W/VW,H/VH);
-  const ratioDrift=Math.abs((W/H)/(VW/VH)-1);
-  vScale=ratioDrift<0.22?coverScale:containScale;
+  // Always "cover" (fill the screen edge-to-edge, cropping world edges if
+  // needed) rather than "contain" (letterbox, black bars). A letterboxed
+  // fit was the direct cause of the "too small with a black edge" look on
+  // mobile landscape — any drift between the live viewport ratio and the
+  // ratio VW/VH was frozen at (URL bar show/hide, orientation-lock failing
+  // on iOS, notches) snapped the fit down to a small boxed rectangle
+  // surrounded by bars. Cropping a sliver of arena is far less noticeable
+  // and never shrinks the action, so cover wins unconditionally.
+  vScale=Math.max(W/VW,H/VH);
   vOffX=(W-VW*vScale)/2;vOffY=(H-VH*vScale)/2;
   bgCache=null;
 }
