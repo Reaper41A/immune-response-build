@@ -356,7 +356,38 @@ function wireUi(){
     }
   });
   document.addEventListener('visibilitychange',()=>{
-    if(document.hidden&&App.screen==='playing'&&App.mode==='solo')togglePause();
+    if(document.hidden){
+      if(App.screen==='playing'&&App.mode==='solo')togglePause();
+      return;
+    }
+    // Tab just came back to the foreground. A backgrounded tab can leave a
+    // WebSocket that LOOKS open (readyState===1) but is actually dead —
+    // mobile browsers freeze JS timers and network callbacks while hidden,
+    // so 'close' never fires until something pokes the socket. If we're
+    // supposed to be in a squad (lobby or an active run) but the socket is
+    // missing/not OPEN, force a rejoin immediately instead of waiting for
+    // the player to notice they're stuck and manually leave/rejoin.
+    const inSquadContext=App.mode==='mp'||App.screen==='lobby';
+    if(inSquadContext&&loadSquadIdentity()){
+      const alive=App.ws&&App.ws.readyState===1;
+      if(!alive){requestRejoin(true);}
+      else{
+        // Socket claims to be open — verify it actually still works by
+        // pinging the server and forcing a fresh connection if nothing
+        // comes back in time. This catches the zombie-socket case that
+        // readyState alone can't detect.
+        const pingedAt=Date.now();
+        App.visibilityPingSeq=(App.visibilityPingSeq||0)+1;
+        const seq=App.visibilityPingSeq;
+        try{netSend({t:'hi'});}catch(_){}
+        setTimeout(()=>{
+          if(App.visibilityPingSeq!==seq)return; // superseded by a newer check
+          if(!App.ws||App.ws.readyState!==1||(App.lastServerMsgAt||0)<pingedAt){
+            requestRejoin(true);
+          }
+        },1500);
+      }
+    }
   });
 
   buildBestiaryGrid();

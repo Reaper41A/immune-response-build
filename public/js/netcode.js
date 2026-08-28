@@ -137,17 +137,6 @@ function refreshRejoinButton(){
     btn.classList.add('hidden');
   }
 }
-function requestRejoin(){
-  const saved=loadSquadIdentity();
-  if(!saved)return;
-  App.leaving=false;App.reconnectAttempts=0;
-  const sendRejoin=()=>{
-    App.rejoinPending={code:saved.code,pid:saved.pid};
-    netSend({t:'rejoin',code:saved.code,pid:saved.pid});
-  };
-  if(App.ws&&App.ws.readyState===1)sendRejoin();
-  else connectWS(sendRejoin);
-}
 let reconnectTimer=null;
 /* Two flavors of auto-reconnect:
    'run'    — socket blip while in a squad (lobby or mid-match)
@@ -155,7 +144,11 @@ let reconnectTimer=null;
 function scheduleReconnect(kind){
   if(App.leaving||App.reconnectTimer)return;
   const isRun=kind!=='rejoin';
-  if(isRun&&App.mode!=='mp')return;
+  // A squad member can be sitting in the lobby (App.mode isn't 'mp' yet —
+  // that's only set once the match actually starts) or mid-run (App.mode
+  // ==='mp'). Both need auto-reconnect; only bail if we were never in a
+  // squad context at all.
+  if(isRun&&App.mode!=='mp'&&App.screen!=='lobby')return;
   App.reconnectAttempts=(App.reconnectAttempts||0)+1;
   const max=isRun?12:6;
   if(App.reconnectAttempts>max){
@@ -185,12 +178,18 @@ function scheduleReconnect(kind){
 function requestRejoin(auto){
   const saved=loadSquadIdentity();
   if(!saved){refreshRejoinButton();return;}
-  App.leaving=false;
+  App.leaving=false;App.reconnectAttempts=0;
   const sendRejoin=()=>{
     App.rejoinPending={code:saved.code,pid:saved.pid};
     netSend({t:'rejoin',code:saved.code,pid:saved.pid});
   };
-  if(App.ws&&App.ws.readyState===1){sendRejoin();return;}
+  // Never trust a stale App.ws here: a backgrounded/suspended tab can leave
+  // the socket object reporting readyState===1 (OPEN) long after the
+  // underlying TCP connection is dead, because the browser froze the JS
+  // that would have fired 'close'. Force a brand-new connection whenever
+  // we're explicitly trying to rejoin, so a zombie socket can never block
+  // the handshake. connectWS() marks any older ws as superseded.
+  if(App.ws){try{App.ws.close();}catch(_){}App.ws=null;}
   connectWS(sendRejoin,!auto);
 }
 function connectWS(onOpen,retryOnFail){
@@ -211,12 +210,13 @@ function connectWS(onOpen,retryOnFail){
     if(App.ws!==ws)return; // a newer connection superseded this one
     App.connected=false;App.ws=null;
     if(App.leaving)return; // intentional exit — stay put
-    if(App.mode==='mp'||App.inRun)scheduleReconnect('run');
+    if(App.mode==='mp'||App.inRun||App.screen==='lobby')scheduleReconnect('run');
     else if(retryOnFail)scheduleReconnect('rejoin');
     else if(App.screen==='connect')setStatus('Disconnected from server.');
   };
   ws.onerror=()=>{};
   ws.onmessage=e=>{
+    App.lastServerMsgAt=Date.now();
     let msg=null;
     try{msg=JSON.parse(e.data);}catch(_){return;}
     handleServerMsg(msg);
