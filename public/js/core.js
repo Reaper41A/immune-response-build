@@ -57,7 +57,19 @@ function resize(){
   fitWorld();
 }
 function fitWorld(){
-  vScale=Math.min(W/VW,H/VH);
+  // Two candidate scales: contain (letterbox, shows the whole world, may
+  // leave bars) and cover (fill the screen, may crop world edges). A pure
+  // "contain" fit is what produced visible bars any time the live aspect
+  // ratio drifted from the ratio VW/VH was frozen at (e.g. the URL bar
+  // hiding a beat after the run started). Small drifts are extremely
+  // common — a phone's chrome bar showing/hiding changes H by 50-80px
+  // without meaningfully changing the framing — so prefer "cover" and only
+  // fall back toward "contain" when the mismatch is large enough that
+  // cropping would meaningfully cut off arena content players need to see.
+  const containScale=Math.min(W/VW,H/VH);
+  const coverScale=Math.max(W/VW,H/VH);
+  const ratioDrift=Math.abs((W/H)/(VW/VH)-1);
+  vScale=ratioDrift<0.22?coverScale:containScale;
   vOffX=(W-VW*vScale)/2;vOffY=(H-VH*vScale)/2;
   bgCache=null;
 }
@@ -75,6 +87,13 @@ function initWorld(){
 }
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',()=>setTimeout(resize,80));
+// visualViewport fires when the URL bar shows/hides or on-screen keyboard
+// opens — 'resize' alone can miss these on some mobile browsers, leaving
+// stale W/H (and therefore stale letterboxing) until the next full resize.
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',resize);
+  window.visualViewport.addEventListener('scroll',resize);
+}
 
 /* ------------------------------------------------------- fullscreen/landscape
    Must be called synchronously from inside a user-gesture click handler —
