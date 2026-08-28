@@ -474,7 +474,10 @@ function onMessage(conn, raw) {
     case 'i': // guest input intent -> host
       if (room.hostId !== player.pid && player.conn) {
         const host = room.players.get(room.hostId);
-        if (host && host.conn) host.conn.send({ t: 'pi', pid: player.pid, mx: msg.mx | 0, my: msg.my | 0, f: msg.f | 0, a: msg.a | 0 });
+        // ax/ay default to 64 (quantized zero) rather than 0 so an older/
+        // stale client that never sends an aim vector reads as "no aim"
+        // instead of unquantizing to (-1,-1).
+        if (host && host.conn) host.conn.send({ t: 'pi', pid: player.pid, mx: msg.mx | 0, my: msg.my | 0, ax: msg.ax != null ? msg.ax | 0 : 64, ay: msg.ay != null ? msg.ay | 0 : 64, f: msg.f | 0, a: msg.a | 0, sk: msg.sk | 0 });
       }
       break;
     case 'g': // guest draft action -> host (vote/confirm/perk/evo)

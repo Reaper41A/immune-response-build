@@ -64,6 +64,39 @@ function initWorld(){
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',()=>setTimeout(resize,80));
 
+/* ------------------------------------------------------- fullscreen/landscape
+   Must be called synchronously from inside a user-gesture click handler —
+   browsers reject fullscreen/orientation-lock requests made any other way
+   (e.g. after an awaited network round-trip). Both APIs are best-effort:
+   iOS Safari has no orientation-lock API at all (landscape there is just a
+   hint via CSS/rotate-to-play), and fullscreen itself can be denied by the
+   user or blocked in an embedded webview — every failure here is caught
+   and swallowed so a run always starts even if neither takes effect. */
+function requestGameFullscreen(){
+  const el=document.documentElement;
+  const req=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen;
+  if(!req)return;
+  try{
+    const p=req.call(el);
+    if(p&&p.then)p.then(lockLandscape).catch(()=>{});
+    else lockLandscape(); // older vendor-prefixed APIs don't return a promise
+  }catch(_){}
+}
+function lockLandscape(){
+  try{
+    const so=screen.orientation;
+    if(so&&so.lock)so.lock('landscape').catch(()=>{});
+  }catch(_){}
+}
+function exitGameFullscreen(){
+  try{
+    if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();
+  }catch(_){}
+  try{
+    if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+  }catch(_){}
+}
+
 /* World-space helpers — pure functions of the FROZEN virtual size. */
 function worldCore(){return{x:VW*0.5,y:VH*0.52};}
 function coreRadius(){return Math.min(VW,VH)*0.10;}

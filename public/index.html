@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- iOS Safari has no JS fullscreen API at all — Add to Home Screen + these
+     tags is the only way to get a URL-bar-free view there. Android/desktop
+     browsers get real fullscreen via requestGameFullscreen() (core.js),
+     triggered from the Deploy/Ready/Launch click handlers. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:,">
 <title>Immune Response</title>
 <style>
@@ -85,6 +92,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   padding-top:calc(64px + env(safe-area-inset-top));
   background:radial-gradient(ellipse at 50% -10%,rgba(26,44,68,.35),rgba(5,8,15,.45) 78%);
   backdrop-filter:blur(2px);
+  /* Only the panel scrolls (see .draft-panel below) — the screen itself
+     must not also be a scroll container, or you get two independently
+     scrollable regions stacked on top of each other. That's what caused
+     the panel to look off-center and produced a stray/duplicate scrollbar:
+     the outer screen would scroll its centered flex content vertically
+     while the inner panel scrolled its own overflow, and the two fought
+     each other depending on where a touch/wheel event landed. */
+  overflow:visible;
 }
 #screenDraft .draft-panel{pointer-events:auto;}
 
@@ -345,6 +360,31 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #joyBase{position:absolute;width:104px;height:104px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.2);display:none;pointer-events:none;}
 #joyStick{position:absolute;width:46px;height:46px;border-radius:50%;background:rgba(62,232,200,.35);border:1.5px solid var(--plasma);display:none;pointer-events:none;box-shadow:0 0 14px rgba(62,232,200,.5);}
 
+/* Aim stick — right half, mirrors the move stick. Auto-fires while held
+   past its dead zone (see input.js); dragging past the larger dashed ring
+   fires the class skill once per drag-out. Touch-only: on mouse/desktop
+   the old fire/ability buttons stay, since mouse aim + Space/E covers it
+   more naturally there (see the media query below). */
+#aimZone{position:absolute;right:0;bottom:0;width:46%;height:62%;z-index:19;pointer-events:auto;}
+#aimBase{position:absolute;width:104px;height:104px;border-radius:50%;background:rgba(255,77,109,.05);border:1.5px solid rgba(255,141,160,.22);display:none;pointer-events:none;}
+#aimRing{position:absolute;width:164px;height:164px;border-radius:50%;border:2px dashed rgba(255,209,102,.4);display:none;pointer-events:none;transition:border-color .12s ease,background .12s ease;}
+#aimRing.triggered{border-color:var(--gold);background:rgba(255,209,102,.1);}
+/* Skill on cooldown: the ring dims to a flat grey dash instead of the
+   ready gold, so a touch player dragging out gets the same "not yet"
+   signal the old ability button's cooldown ring used to give — otherwise
+   dragging past the ring while on cooldown would just silently do nothing. */
+#aimRing.on-cd{border-color:rgba(255,255,255,.22);background:conic-gradient(rgba(255,255,255,.08) var(--cd-pct,0%),transparent var(--cd-pct,0%));}
+#aimRing.on-cd.triggered{border-color:rgba(255,255,255,.3);background:conic-gradient(rgba(255,255,255,.08) var(--cd-pct,0%),transparent var(--cd-pct,0%));}
+#aimStick{position:absolute;width:46px;height:46px;border-radius:50%;background:rgba(255,77,109,.35);border:1.5px solid var(--infect);display:none;pointer-events:none;box-shadow:0 0 14px rgba(255,77,109,.5);}
+
+/* Touch devices get the twin-stick scheme (move stick + aim stick) instead
+   of the old tap-to-fire / tap-to-ability buttons — the aim stick already
+   covers both of those. Mouse/desktop keeps the buttons since they're a
+   sensible fallback/visual reference alongside mouse-aim + Space/E. */
+@media (hover:none) and (pointer:coarse){
+  .fire-btn,.ability-btn,.fire-key-hint,.ability-key-hint{display:none;}
+}
+
 /* boss bar */
 .boss-bar{
   position:absolute;top:76px;left:50%;transform:translateX(-50%);z-index:21;width:min(60vw,420px);display:none;
@@ -390,9 +430,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 
 /* ------------------------------------------------------------- drafts */
 .draft-panel{
-  width:min(94vw,560px);max-height:88vh;overflow-y:auto;
+  width:min(94vw,560px);
+  /* Room to breathe under the top anchor without colliding with the
+     joystick/fire button lower on the screen. Scrolls only if content
+     genuinely overflows this — normal 3-card drafts never will. */
+  max-height:calc(100vh - 64px - env(safe-area-inset-top) - 140px);
+  overflow-y:auto;
   background:var(--membrane);border-radius:22px;padding:20px;border:1px solid var(--line);
   animation:popIn .35s ease;
+  margin:0 auto; /* belt-and-suspenders horizontal centering under flex */
 }
 .draft-header{text-align:center;margin-bottom:4px;}
 .draft-kicker{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin-bottom:4px;}
@@ -432,6 +478,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .vote-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 5px currentColor;}
 .vote-label{font-family:var(--font-mono);font-size:8px;color:var(--dim);margin-right:2px;}
 .draft-actions{display:flex;gap:10px;margin-top:15px;}
+#btnSkipDraft.picked{border-color:var(--plasma);color:var(--plasma);background:rgba(62,232,200,.12);}
 .draft-note{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);text-align:center;margin-top:10px;line-height:1.5;}
 
 /* ------------------------------------------------------------- howto */
@@ -501,8 +548,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   .boss-bar{top:100px;}
   .draft-panel{padding:14px;}
   /* Keep the draft panel clear of the joystick (bottom-left) and fire
-     button (bottom-right) so repositioning during a draft stays possible. */
-  #screenDraft .draft-panel{max-height:46vh;}
+     button (bottom-right) so repositioning during a draft stays possible.
+     The base .draft-panel max-height rule already accounts for the top
+     anchor and reserves space below; this just tightens the bottom
+     reserve further on small phones instead of hard-capping to a fixed
+     vh that made even a 3-card list scroll unnecessarily. */
+  #screenDraft .draft-panel{max-height:calc(100vh - 64px - env(safe-area-inset-top) - 190px);}
   .lobby-panel{padding:14px;max-height:calc(100vh - 70px);}
   .slot{flex-wrap:wrap;gap:5px 8px;padding:8px 10px;}
   .class-grid{grid-template-columns:repeat(auto-fit,minmax(136px,1fr));}
@@ -582,6 +633,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div id="hintLayer"></div>
 
     <div id="joyZone"><div id="joyBase"></div><div id="joyStick"></div></div>
+    <div id="aimZone"><div id="aimRing"></div><div id="aimBase"></div><div id="aimStick"></div></div>
   </div>
 
   <!-- ========================== SPLASH =========================== -->
@@ -779,6 +831,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="summary-row" id="draftSummary"></div>
       <div class="upgrade-list" id="draftList"></div>
       <div class="draft-note" id="draftNote"></div>
+      <div class="draft-actions" id="draftActions" style="display:none;">
+        <button class="btn ghost small" id="btnSkipDraft">Skip this pick</button>
+      </div>
     </div>
   </div>
 

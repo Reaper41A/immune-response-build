@@ -48,7 +48,7 @@ const SHOT_SFX={phagoShotgun:'shot_shotgun',enzymeBeam:'shot_beam',dualSmg:'shot
 const ENEMY_DEFS={
   bacteria:{name:'Bacteria',hp:14,speed:96,dmg:10,radius:11,color:'#8fe36a',glow:'#c8ffb0',ep:4,
     tell:'Basic swarm unit.'},
-  virus:{name:'Virus',hp:26,speed:118,dmg:30,radius:13,color:'#ff4d6d',glow:'#ff9fb0',ep:8,erratic:true,minWave:2,
+  virus:{name:'Virus',hp:26,speed:104,dmg:30,radius:13,color:'#ff4d6d',glow:'#ff9fb0',ep:8,erratic:true,minWave:2,
     tell:'Erratic zig-zag — hard to track.'},
   fungi:{name:'Fungi',hp:70,speed:52,dmg:20,radius:18,color:'#6fae5f',glow:'#d7f5c9',ep:14,spore:true,minWave:4,
     tell:'Slow tank that sheds spores when hurt.'},
@@ -125,6 +125,19 @@ const UPGRADE_POOL=[
 ];
 const CAT_COLOR={survival:'#8fe36a',weapons:'#ff8ea0',economy:'#3ee8c8',mobility:'#7fd6ff',defense:'#ffd166'};
 const UPG_BY_ID={};UPGRADE_POOL.forEach(u=>UPG_BY_ID[u.id]=u);
+
+/* Squad-EP income grows with the wave (wave 1 ~70-100 EP -> wave 5
+   ~150-170 EP), but upgrade.cost was a flat wave-1 baseline forever, so
+   later drafts became trivially affordable and stopped being a real
+   choice. Scale cost with the wave instead of mutating the base pool —
+   every read site below goes through this so the pool stays the single
+   source of truth for the wave-1 price. +9%/wave, mirroring the roughly
+   +25-30% per-wave EP growth from planWave's budget curve but slightly
+   gentler so upgrades still get relatively more affordable over a run,
+   just not so fast that wave 5+ drafts become no-brainers. */
+function scaledCost(upg,wave){
+  return Math.round(upg.cost*(1+0.09*Math.max(0,(wave||1)-1)));
+}
 
 const PERSONAL_PERK_POOL=[
   {id:'p_ammoMax',name:'Larger Vesicles',icon:'🔋',desc:'+25% max ammo capacity'},

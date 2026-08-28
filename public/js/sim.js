@@ -50,7 +50,7 @@ function makePlayerEntity(pid,name,clsKey,isBot){
     dashVX:0,dashVY:0,
     alive:true,respawnTimer:0,kills:0,
     lockId:null,lockRef:null,
-    inMove:{x:0,y:0},inFiring:false,inAbility:false,
+    inMove:{x:0,y:0},inAim:{x:0,y:0},inFiring:false,inAbility:false,inSkillEdge:false,
     wanderA:rand(0,Math.PI*2),
   };
 }

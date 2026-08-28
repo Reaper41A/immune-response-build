@@ -8,7 +8,13 @@
    systems entirely — they're sound"). Bosses every 5th wave. */
 function planWave(waveNum){
   const q=[];
-  const budget=40+waveNum*14;
+  // Wave 1 is a special case: the standard 40+n*14 curve gives it a ~72 EP
+  // ceiling even on a flawless clear (18 bacteria @ 4 EP each), but the
+  // cheapest squad upgrade costs 80 — so the very first squad draft was
+  // guaranteed to be unaffordable no matter how well the squad played.
+  // Bumping wave 1's budget alone (not the curve) fixes that without
+  // touching wave 2+ pacing.
+  const budget=waveNum===1?78:40+waveNum*14;
   let spent=0;
   const flags=mutFlags(waveNum);
   const roster=ROSTER.filter(([k,w])=>waveNum>=w).map(([k])=>k);
@@ -99,6 +105,17 @@ function enterSquadDraft(){
   const pool=[...UPGRADE_POOL.map(u=>u.id)];
   const opts=[];
   while(opts.length<3&&pool.length)opts.push(pool.splice(randi(0,pool.length-1),1)[0]);
+  // Guarantee the squad can always afford at least the cheapest of the three
+  // offered cards. Early waves (esp. wave 1) can't realistically earn enough
+  // kill EP to afford anything — the draft would silently resolve to
+  // "nothing affordable" every single time, which read as a dead/broken
+  // screen. This tops EP up to the floor needed, never lowers it.
+  const cheapest=Math.min(...opts.map(id=>scaledCost(UPG_BY_ID[id],SIM.wave)));
+  if(SIM.ep<cheapest){
+    const shortfall=cheapest-SIM.ep;
+    SIM.ep=cheapest;
+    ev({k:'say',sys:true,text:`Squad short on EP this wave — topped up +${shortfall} so a pick is always affordable`,color:'#ffd166'});
+  }
   // Squad draft is a group decision: everyone selects, nobody can close it
   // alone. No countdown either — the screen waits as long as it takes for
   // every human to lock in a choice (or explicitly abstain).
@@ -120,16 +137,21 @@ function enterSquadDraft(){
 }
 function topVotedAffordable(){
   const tally={};
-  for(const v of Object.values(SIM.draft.votes))tally[v]=(tally[v]||0)+1;
+  for(const v of Object.values(SIM.draft.votes)){
+    if(v==='skip')continue; // skip votes don't compete for a card
+    tally[v]=(tally[v]||0)+1;
+  }
   let best=null,bn=0;
   for(const[id,n]of Object.entries(tally)){
-    if(SIM.ep>=UPG_BY_ID[id].cost&&n>bn){best=id;bn=n;}
+    if(SIM.ep>=scaledCost(UPG_BY_ID[id],SIM.wave)&&n>bn){best=id;bn=n;}
   }
   return best;
 }
 /* A player selects/changes their vote — this is not a confirm, just a pick.
    The draft only resolves once every human has locked one in (see
-   allHumansVotedSquad + resolveSquadDraft, ticked from simUpdate). */
+   allHumansVotedSquad + resolveSquadDraft, ticked from simUpdate). A vote
+   of 'skip' means "I'd rather not spend EP this round" and never competes
+   for a card, but still counts toward everyone-has-voted. */
 function voteSquad(pid,id){
   if(!SIM||SIM.over||SIM.phase!=='squadDraft')return;
   SIM.draft.votes[pid]=id;
@@ -140,18 +162,23 @@ function allHumansVotedSquad(){
   return true;
 }
 /* Resolves the group's shared pick once everyone has voted. No single
-   player's action can force this early or skip it for the rest of the squad. */
+   player's action can force this early or skip it for the rest of the squad.
+   If every human voted skip, or nothing affordable got the most votes, no
+   upgrade is bought and EP carries over to the next draft. */
 function resolveSquadDraft(){
   const id=topVotedAffordable();
   const opt=id?UPG_BY_ID[id]:null;
   if(opt){
-    if(SIM.ep>=opt.cost){
-      SIM.ep-=opt.cost;
+    const cost=scaledCost(opt,SIM.wave);
+    if(SIM.ep>=cost){
+      SIM.ep-=cost;
       applyUpgrade(opt.id);
       ev({k:'buy',name:opt.name,pid:-1});
     }else{
       ev({k:'say',sys:true,text:`Not enough EP for ${opt.name} — draft skipped`,color:'#ff8ea0'});
     }
+  }else{
+    ev({k:'say',sys:true,text:'Squad skipped this pick',color:'#7fd6ff'});
   }
   enterPersonalDrafts();
 }
@@ -168,7 +195,7 @@ function applyUpgrade(id){
         const c=worldCore(),a=rand(0,Math.PI*2);
         SIM.turrets.push({x:c.x+Math.cos(a)*170,y:c.y+Math.sin(a)*170,cd:0,range:220});
       }else{
-        SIM.ep+=UPG_BY_ID[id].cost;
+        SIM.ep+=scaledCost(UPG_BY_ID[id],SIM.wave);
         ev({k:'say',sys:true,text:'Turret limit reached (4) — EP refunded',color:'#ffd166'});
       }
       break;

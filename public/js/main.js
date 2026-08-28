@@ -297,8 +297,8 @@ function wireUi(){
     if(copyText(url))toast('Invite link copied — send it to your squad');
     else toast('Copy blocked — share the code '+c+' instead',true);
   });
-  $('btnReady').addEventListener('click',()=>netSend({t:'ready'}));
-  $('btnLaunch').addEventListener('click',()=>netSend({t:'startGame'}));
+  $('btnReady').addEventListener('click',()=>{requestGameFullscreen();netSend({t:'ready'});});
+  $('btnLaunch').addEventListener('click',()=>{requestGameFullscreen();netSend({t:'startGame'});});
   $('btnRejoin').addEventListener('click',()=>{
     AudioSys.play('ui');
     requestRejoin();
@@ -309,7 +309,7 @@ function wireUi(){
     App.ws=null;showScreen('screenSplash');
   });
 
-  $('btnSoloDeploy').addEventListener('click',()=>startSoloRun());
+  $('btnSoloDeploy').addEventListener('click',()=>{requestGameFullscreen();startSoloRun();});
   $('btnSoloBack').addEventListener('click',()=>showScreen('screenSplash'));
 
   $('pauseBtn').addEventListener('click',togglePause);
@@ -317,12 +317,16 @@ function wireUi(){
   $('btnPauseHowTo').addEventListener('click',()=>{howtoReturn='screenPause';showScreen('screenHowTo');});
   $('btnReplayHints').addEventListener('click',resetHints);
   $('btnQuit').addEventListener('click',()=>{
-    if(App.mode==='mp')leaveToMenu();
-    else{App.inRun=false;SIM=null;showScreen('screenSplash');}
+    if(App.mode==='mp')leaveToMenu(); // leaveToMenu() exits fullscreen itself
+    else{exitGameFullscreen();App.inRun=false;SIM=null;showScreen('screenSplash');}
   });
+  $('btnSkipDraft').addEventListener('click',skipSquadDraft);
 
   $('btnRetry').addEventListener('click',()=>{
-    if(App.mode==='mp'){netSend({t:'toLobby'});toast('Returning squad to lobby…');}
+    // Solo retry goes straight back into a run — stay fullscreen, no reason
+    // to drop out and immediately re-prompt. MP retry returns the whole
+    // squad to the lobby, which is menu-like, so exit there.
+    if(App.mode==='mp'){exitGameFullscreen();netSend({t:'toLobby'});toast('Returning squad to lobby…');}
     else startSoloRun();
   });
   $('btnMainMenu2').addEventListener('click',()=>leaveToMenu());

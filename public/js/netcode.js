@@ -280,8 +280,13 @@ function handleServerMsg(msg){
       if(p&&p.human&&!p.isBot&&p.pid!==App.myPid){
         p.inMove.x=(msg.mx-64)/64;
         p.inMove.y=(msg.my-64)/64;
+        // ax/ay may be absent from an older cached client — default to "no
+        // aim" (0,0) rather than unquantizing undefined into (-1,-1).
+        p.inAim.x=msg.ax!=null?(msg.ax-64)/64:0;
+        p.inAim.y=msg.ay!=null?(msg.ay-64)/64:0;
         p.inFiring=!!msg.f;
         if(msg.a)p.inAbility=true;
+        if(msg.sk)p.inSkillEdge=true;
       }
       break;
     }
@@ -337,8 +342,12 @@ function sendInputsIfGuest(dt){
     t:'i',
     mx:clamp(Math.round(inp.move.x*64)+64,0,128),
     my:clamp(Math.round(inp.move.y*64)+64,0,128),
-    f:inp.firing?1:0,
+    ax:clamp(Math.round(inp.aim.x*64)+64,0,128),
+    ay:clamp(Math.round(inp.aim.y*64)+64,0,128),
+    f:(inp.firing||inp.aiming)?1:0,
     a:inp.abilityEdge?1:0,
+    sk:inp.skillEdge?1:0,
   });
   inp.abilityEdge=false;
+  inp.skillEdge=false;
 }

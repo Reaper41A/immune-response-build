@@ -89,7 +89,14 @@ function updateHumanPlayer(p,dt){
   // the sim host's OWN cell had no bridge from Input -> its entity, which
   // left the host unable to move or fire. Read local devices here.
   if(App.isHost&&p.pid===App.myPid){
-    p.inMove.x=Input.move.x;p.inMove.y=Input.move.y;p.inFiring=Input.firing;
+    p.inMove.x=Input.move.x;p.inMove.y=Input.move.y;
+    // Manual aim: the aim stick (touch) or mouse position (desktop) sets
+    // both fire direction and whether we're firing at all — holding the
+    // stick out (or mouse-down) fires toward wherever it's pointed, no
+    // more "always shoot whatever's nearest" for the local player.
+    p.inAim.x=Input.aim.x;p.inAim.y=Input.aim.y;
+    p.inFiring=Input.aiming||Input.firing;
+    if(Input.skillEdge){p.inSkillEdge=true;Input.skillEdge=false;}
   }
   let mx=p.inMove.x,my=p.inMove.y;
   const len=Math.hypot(mx,my);
@@ -111,12 +118,22 @@ function updateHumanPlayer(p,dt){
   }
   clampToArena(p);
   autoPickup(p);
-  const locked=acquireOrRetainTarget(p,p,SIM.enemies,p.inFiring);
+  // Skill trigger from dragging the aim stick past its outer ring — edge
+  // flag set above (or by the guest's own peer-input, see netcode.js 'pi').
+  // useAbility() is already self-gating on cooldown, so a stray double-set
+  // of the flag before this tick can't double-fire the skill.
+  if(p.inSkillEdge){p.inSkillEdge=false;useAbility(p);}
+  const aimLen=Math.hypot(p.inAim.x,p.inAim.y);
   p.fireCd-=dt;
   updateAmmoHeat(p,dt);
-  if(p.inFiring&&locked){
-    p.facing=angleTo(p.x,p.y,locked.x,locked.y);
-    if(p.fireCd<=0&&canFire(p))fireWeapon(p,locked.x,locked.y);
+  if(p.inFiring&&aimLen>0.01){
+    // Manual aim: fire toward the stick/mouse direction, not the nearest
+    // enemy. Project a point far out along that direction — fireWeapon
+    // only needs an angle, and this keeps it a straight-line shot that
+    // hits whatever's actually in its path, same as before.
+    const tx=p.x+p.inAim.x*1000,ty=p.y+p.inAim.y*1000;
+    p.facing=Math.atan2(p.inAim.y,p.inAim.x);
+    if(p.fireCd<=0&&canFire(p))fireWeapon(p,tx,ty);
   }
 }
 

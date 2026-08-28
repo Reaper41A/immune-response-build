@@ -174,13 +174,21 @@ function openDraftScreen(phase){
   AudioSys.play('draftOpen');
   const panel=$('screenDraft');
   const title=$('draftTitle'),sub=$('draftSub'),note=$('draftNote');
+  const actions=$('draftActions'),skipBtn=$('btnSkipDraft');
   panel.classList.toggle('no-timer',phase==='squadDraft');
-  // All draft kinds are select-and-lock now — nothing single-handedly closes
-  // the screen for the group, so there's no confirm/skip button anymore.
+  // Personal-perk and evolution drafts are select-and-lock with no button —
+  // nothing single-handedly closes those for the group either, since an
+  // unpicked slot just times out and is skipped for that one player only.
+  // Squad draft is the one case that needs an explicit "skip" affordance:
+  // voting for no card at all is a valid group decision, not just an
+  // absence of one, so it gets its own button (see voteSquad('skip')).
+  actions.style.display=phase==='squadDraft'?'flex':'none';
   if(phase==='squadDraft'){
     title.textContent='SQUAD DRAFT';title.style.color='var(--gold)';
     sub.textContent='One shared upgrade, bought with squad EP.';
-    note.innerHTML='Click a card to lock in your vote. This is a <b>group decision</b> — the most-voted affordable card is bought once <b>everyone</b> has voted. No timer, no rush.';
+    note.innerHTML='Click a card to lock in your vote, or Skip if the squad would rather save EP. This is a <b>group decision</b> — it resolves once <b>everyone</b> has voted. No timer, no rush.';
+    skipBtn.classList.remove('picked');
+    skipBtn.disabled=false;
   }else if(phase==='personalDraft'){
     title.textContent='YOUR EVOLUTION';title.style.color='var(--plasma)';
     sub.textContent='A personal perk — free, just for you.';
@@ -202,15 +210,17 @@ function renderDraftList(votesMap){
   else if(draftKind==='personalDraft')optIds=((currentView&&currentView.personalOptions)||{})[String(App.myPid)]||((currentView&&currentView.personalOptions)||{})[App.myPid]||[];
   else optIds=((currentView&&currentView.evoOptions)||{})[String(App.myPid)]||((currentView&&currentView.evoOptions)||{})[App.myPid]||[];
   const ep=currentView?currentView.ep:0;
+  const wave=currentView?currentView.wave:1;
   optIds.forEach((id,idx)=>{
     const meta=draftKind==='squadDraft'?UPG_BY_ID[id]:(draftKind==='personalDraft'?PERK_BY_ID[id]:EVO_BY_ID[id]);
     if(!meta)return;
-    const afford=draftKind!=='squadDraft'||ep>=meta.cost;
+    const cost=draftKind==='squadDraft'?scaledCost(meta,wave):0;
+    const afford=draftKind!=='squadDraft'||ep>=cost;
     const card=document.createElement('div');
     card.className='upgrade-card'+(draftSelId===id?' picked':'')+(afford?'':' disabled');
     card.style.setProperty('--oc',draftKind==='squadDraft'?CAT_COLOR[meta.cat]:CLASSES[App.myClass].color);
     const costHtml=draftKind==='squadDraft'
-      ?(afford?`<div class="upgrade-cost">◈${meta.cost}</div>`:`<div class="upgrade-cost cant">NEED ◈${meta.cost}</div>`)
+      ?(afford?`<div class="upgrade-cost">◈${cost}</div>`:`<div class="upgrade-cost cant">NEED ◈${cost}</div>`)
       :'';
     let votesHtml='';
     if(draftKind==='squadDraft'&&votesMap){
@@ -238,6 +248,7 @@ function selectDraftOption(id,afford){
     // (see resolveSquadDraft in waves.js).
     if(!afford){toast('Not enough EP for that upgrade',true);return;}
     draftSelId=id;
+    $('btnSkipDraft').classList.remove('picked');
     renderDraftList(currentView&&currentView.votes);
     if(App.mode==='mp'&&!App.isHost)netSend({t:'g',d:{a:'vote',id}});
     else if(SIM&&SIM.draft)voteSquad(App.myPid,id);
@@ -250,6 +261,18 @@ function selectDraftOption(id,afford){
     if(App.isHost&&SIM){(draftKind==='personalDraft'?pickPersonal:pickEvolution)(App.myPid,id);}
     else netSend({t:'g',d:{a:draftKind==='personalDraft'?'perk':'evo',id}});
   }
+}
+/* The squad votes to buy nothing this round. Same vote-and-wait machinery
+   as picking a card (voteSquad with the 'skip' sentinel) — it just never
+   competes for a card in topVotedAffordable. */
+function skipSquadDraft(){
+  if(draftKind!=='squadDraft')return;
+  AudioSys.play('ui');
+  draftSelId=null;
+  $('btnSkipDraft').classList.add('picked');
+  renderDraftList(currentView&&currentView.votes);
+  if(App.mode==='mp'&&!App.isHost)netSend({t:'g',d:{a:'vote',id:'skip'}});
+  else if(SIM&&SIM.draft)voteSquad(App.myPid,'skip');
 }
 let currentView=null;
 function syncDraftScreens(view){
@@ -322,6 +345,7 @@ function showResults(stats,reason){
 
 /* ---------------------------------------------------------------- misc UI */
 function leaveToMenu(){
+  exitGameFullscreen(); // covers every path here: quit, kick, disconnect, host-ended
   App.leaving=true; // suppress auto-reconnect — this exit was intentional
   App.inRun=false;App.mode=null;App.isHost=false;SIM=null;
   clearSquadIdentity();

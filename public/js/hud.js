@@ -13,7 +13,7 @@ function cacheHudRefs(){
    'organIcons','debuffRow','bossBar','bossName','bossFill','squadPanel',
    'weaponName','ammoFill','ammoLabel','heatFill','heatLabel','ammoBanner',
    'abilityBtn','abilityIcon','abilityCdRing','abilityCdNum','fireBtn',
-   'vignetteLow'].forEach(id=>HUDREF[id]=$(id));
+   'aimRing','vignetteLow'].forEach(id=>HUDREF[id]=$(id));
 }
 let hudSlowTimer=0;
 let hudFastTimer=0;
@@ -87,6 +87,15 @@ function updateAbilityButton(me){
   HUDREF.abilityCdNum.textContent=me.ac>0?Math.ceil(me.ac):'';
   HUDREF.abilityBtn.classList.toggle('on-cd',me.ac>0);
   HUDREF.abilityBtn.classList.toggle('ready-pulse',!(me.ac>0));
+  // The ability button itself is hidden on touch (skill now triggers via
+  // the aim-stick outer ring), but the cooldown is still real information
+  // — without this, a touch player dragging out to trigger the skill
+  // while it's on cooldown would get silent nothing with zero feedback.
+  const ring=HUDREF.aimRing;
+  if(ring){
+    ring.classList.toggle('on-cd',me.ac>0);
+    ring.style.setProperty('--cd-pct',(cdFrac*100)+'%');
+  }
 }
 function updateBossBar(view){
   const b=view.boss; // finalizeView fills this on both host & guest paths
