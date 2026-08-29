@@ -3,6 +3,8 @@
    ========================================================================== */
 'use strict';
 
+const GAME_VERSION='1.2.0'; // see js/changelog.js (drives in-game CHANGELOG tab)
+
 /* ---------------------------------------------------------------- utils */
 const rand=(a,b)=>a+Math.random()*(b-a);
 const randi=(a,b)=>Math.floor(rand(a,b+1));

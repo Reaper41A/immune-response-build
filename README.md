@@ -1,5 +1,15 @@
 # IMMUNE RESPONSE
 
+**v1.2.0** — see [CHANGELOG.md](./CHANGELOG.md) for what's new, or the
+in-game **Changelog** tab (main menu) for the player-facing version with a
+built-in **Nerfs & Buffs** history across all versions.
+
+> ⚠️ **DEV NOTE (including AI devs):** Any session that changes game
+> balance, features, or content **must** add a changelog entry in
+> `public/js/changelog.js` before finishing — that file drives the in-game
+> Changelog/Nerfs & Buffs tab players actually see. See the dev-note
+> comment block at the top of that file for the expected format.
+
 Co-op evolution shooter for up to 4 players defending a shared Body against
 evolving pathogens. Zero dependencies — one file of server, a folder of
 vanilla JS, no build step, no npm install.

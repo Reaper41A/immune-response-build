@@ -124,6 +124,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   letter-spacing:.18em;text-transform:uppercase;margin-bottom:30px;text-align:center;
   animation:riseIn .5s ease .05s both;
 }
+.version-tag{
+  font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.3);
+  letter-spacing:.08em;text-align:center;margin-top:-22px;margin-bottom:22px;
+  animation:riseIn .5s ease .08s both;
+}
 
 .organ-blob{width:min(42vw,190px);height:min(42vw,190px);margin-bottom:22px;animation:riseIn .6s ease .1s both,heartbeat 3s ease-in-out infinite .6s;}
 @keyframes heartbeat{0%,100%{transform:scale(1)}12%{transform:scale(1.05)}24%{transform:scale(1)}36%{transform:scale(1.03)}48%{transform:scale(1)}}
@@ -561,6 +566,85 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   .bestiary-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
 }
 
+/* ------------------------------------------------------------ changelog */
+.changelog-screen{width:min(94vw,560px);max-height:84vh;overflow-y:auto;padding:4px 2px 12px;}
+.changelog-toggle-row{display:flex;justify-content:center;gap:8px;margin-bottom:14px;}
+.changelog-toggle{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;font-weight:700;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--dim);
+  border-radius:10px;padding:8px 14px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.changelog-toggle:hover{background:rgba(255,255,255,.1);}
+.changelog-toggle.active{background:rgba(62,232,200,.14);border-color:rgba(62,232,200,.5);color:var(--plasma);}
+.changelog-list{display:flex;flex-direction:column;gap:10px;}
+.changelog-entry{
+  background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;cursor:pointer;transition:background .15s,border-color .15s;
+}
+.changelog-entry:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.16);}
+.changelog-entry-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.changelog-entry-version{font-size:14.5px;font-weight:800;color:var(--tissue);}
+.changelog-entry-version .v-num{color:var(--plasma);font-family:var(--font-mono);}
+.changelog-entry-date{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);letter-spacing:.05em;}
+.changelog-entry-title{font-size:12px;color:var(--dim);margin-top:3px;}
+.changelog-entry-chip-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.changelog-chip{
+  font-family:var(--font-mono);font-size:8.5px;letter-spacing:.05em;font-weight:700;
+  padding:3px 8px;border-radius:20px;text-transform:uppercase;
+}
+.changelog-chip.added{background:rgba(143,227,106,.15);color:var(--good);}
+.changelog-chip.changed{background:rgba(127,214,255,.15);color:var(--antibody);}
+.changelog-chip.nerfs{background:rgba(255,77,109,.15);color:#ff8ea0;}
+.changelog-chip.buffs{background:rgba(255,209,102,.15);color:var(--gold);}
+.changelog-chip.fixed{background:rgba(192,132,252,.15);color:var(--toxin);}
+.changelog-detail-back{
+  font-family:var(--font-mono);font-size:10px;color:var(--dim);letter-spacing:.06em;
+  background:none;border:none;cursor:pointer;padding:0 0 12px;display:flex;align-items:center;gap:5px;
+}
+.changelog-detail-back:hover{color:var(--tissue);}
+.changelog-detail-head{margin-bottom:14px;}
+.changelog-detail-title{font-size:19px;font-weight:800;color:var(--tissue);}
+.changelog-detail-version{font-family:var(--font-mono);font-size:11px;color:var(--plasma);margin-top:2px;}
+.changelog-detail-date{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);margin-top:1px;}
+.changelog-section{margin-top:16px;}
+.changelog-section-title{
+  font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--line);
+}
+.changelog-section-title.added{color:var(--good);}
+.changelog-section-title.changed{color:var(--antibody);}
+.changelog-section-title.nerfs{color:#ff8ea0;}
+.changelog-section-title.buffs{color:var(--gold);}
+.changelog-section-title.fixed{color:var(--toxin);}
+.changelog-section ul{margin:0;padding-left:18px;}
+.changelog-section li{font-size:12.5px;line-height:1.6;color:var(--dim);margin-bottom:6px;}
+.changelog-section li b{color:var(--tissue);}
+.nb-group{margin-bottom:18px;}
+.nb-group-head{font-family:var(--font-mono);font-size:10px;color:var(--dim);letter-spacing:.08em;margin-bottom:6px;}
+.nb-item{
+  display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--dim);
+  background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:6px;
+}
+.nb-item .nb-tag{
+  flex:0 0 auto;font-family:var(--font-mono);font-size:8.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 7px;border-radius:20px;margin-top:1px;
+}
+.nb-item.nerf .nb-tag{background:rgba(255,77,109,.18);color:#ff8ea0;}
+.nb-item.buff .nb-tag{background:rgba(255,209,102,.18);color:var(--gold);}
+.nb-item .nb-body b{color:var(--tissue);}
+.nb-item .nb-ver{font-family:var(--font-mono);font-size:9px;color:var(--dim);opacity:.8;margin-left:4px;}
+.changelog-empty{font-size:12.5px;color:var(--dim);text-align:center;padding:30px 10px;}
+
+/* unread-update notification dot, shown on the menu button that opens
+   the Changelog until the player has actually opened it */
+.notif-dot{
+  position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;
+  background:var(--infect);box-shadow:0 0 0 2px var(--void-mid),0 0 8px rgba(255,77,109,.7);
+  animation:notifPulse 1.6s ease-in-out infinite;
+}
+@keyframes notifPulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.25);opacity:.75;}}
+.btn-with-notif{position:relative;}
+
 /* mockup diagrams */
 .diagram-joystick{width:86px;height:86px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;}
 .diagram-joystick-nub{width:38px;height:38px;border-radius:50%;background:rgba(62,232,200,.35);border:1.5px solid var(--plasma);}
@@ -708,11 +792,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     </svg>
     <h1 class="cell-title">IMMUNE RESPONSE</h1>
     <div class="cell-sub">Co-op Evolution Shooter · Defend the Body</div>
+    <div class="version-tag" id="versionTag"></div>
     <div class="btn-stack">
       <button class="btn" id="btnSolo">Play Solo (with AI squad)</button>
       <button class="btn ghost" id="btnMultiplayer">Multiplayer — Squad Up</button>
       <button class="btn ghost small hidden" id="btnRejoin">Rejoin Squad</button>
       <button class="btn ghost small" id="btnHowToFromSplash">How to Play</button>
+      <button class="btn ghost small btn-with-notif" id="btnChangelogFromSplash">Changelog<span class="notif-dot hidden" id="changelogNotifDot"></span></button>
     </div>
     <div class="footnote">Up to 4 players defend a shared body against evolving pathogens. Solo fills empty seats with AI squadmates.</div>
   </div>
@@ -862,6 +948,19 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div class="btn-stack" style="margin-top:12px;"><button class="btn ghost" id="btnHowToBack">Back</button></div>
   </div>
 
+  <!-- ============================= CHANGELOG ========================== -->
+  <div class="screen hidden" id="screenChangelog">
+    <div class="cell-sub" style="margin-bottom:8px;">CHANGELOG</div>
+    <div class="changelog-toggle-row">
+      <button class="changelog-toggle active" id="btnChangelogTabVersions">By Version</button>
+      <button class="changelog-toggle" id="btnChangelogTabNerfsBuffs">Nerfs &amp; Buffs</button>
+    </div>
+    <div class="changelog-screen" id="changelogScreenBody">
+      <!-- version list, version detail, or nerfs&buffs view is rendered here by ui.js -->
+    </div>
+    <div class="btn-stack" style="margin-top:12px;"><button class="btn ghost" id="btnChangelogBack">Back</button></div>
+  </div>
+
   <!-- ============================== PAUSE ============================ -->
   <div class="screen hidden" id="screenPause">
     <div class="cell-title" style="font-size:32px;">PAUSED</div>
@@ -922,6 +1021,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <script src="js/render.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/bestiary.js"></script>
+<script src="js/changelog.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/input.js"></script>
 <script src="js/ui.js"></script>
