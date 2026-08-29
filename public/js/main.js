@@ -265,6 +265,10 @@ function wireUi(){
   $('btnHowToFromSplash').addEventListener('click',()=>{howtoReturn='screenSplash';showScreen('screenHowTo');});
   $('btnHowToBack').addEventListener('click',()=>showScreen(howtoReturn));
   $('btnConnectBack').addEventListener('click',()=>showScreen('screenSplash'));
+  $('btnChangelogFromSplash').addEventListener('click',()=>{openChangelog();});
+  $('btnChangelogBack').addEventListener('click',()=>showScreen('screenSplash'));
+  $('btnChangelogTabVersions').addEventListener('click',()=>showChangelogVersionList());
+  $('btnChangelogTabNerfsBuffs').addEventListener('click',()=>showChangelogNerfsBuffs());
 
   function ensureConnected(cb){
     App.leaving=false;App.reconnectAttempts=0;
@@ -393,6 +397,7 @@ function wireUi(){
   buildBestiaryGrid();
 
   resize();
+  refreshChangelogNotifDot();
   showScreen('screenSplash');
   // Invite links (#join=CODE) skip the menu entirely: land straight on the
   // connect screen with the code filled in — one name + one tap to join.
