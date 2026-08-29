@@ -165,7 +165,7 @@ function simUpdate(dt){
   // players can still walk around and reposition for the wave ahead instead
   // of being frozen in place.
   if(SIM.phase!=='wave'){
-    if(SIM.phase!=='squadDraft')SIM.phaseTimer-=dt; // squad draft has no timer — it's a group decision
+    SIM.phaseTimer-=dt;
     for(const p of SIM.players)updateDraftMovement(p,dt);
     resolveDraftTimeouts();
     if(SIM.phase==='squadDraft'&&allHumansVotedSquad())resolveSquadDraft();
@@ -217,6 +217,7 @@ function simUpdate(dt){
     if(p.abilityActive>0){p.abilityActive-=dt;if(p.abilityActive<=0)onAbilityEnd(p);}
     if(p.invuln>0)p.invuln-=dt;
     if(p.isBot)updateBot(p,dt);else updateHumanPlayer(p,dt);
+    tickPlayerPerks(p,dt);
   }
   // ability edge-triggers from inputs (local or networked)
   for(const p of SIM.players){
@@ -265,7 +266,8 @@ function simUpdate(dt){
     }
   }
 
-  // turrets
+  // turrets — Turret Overclock (epic) speeds up every turret's cadence;
+  // heavy sentries from Last Line of Defense (legendary) hit twice as hard.
   for(const t of SIM.turrets){
     t.cd-=dt;
     if(t.cd<=0){
@@ -275,7 +277,7 @@ function simUpdate(dt){
         const d=dist2(t.x,t.y,en.x,en.y);
         if(d<t.range*t.range&&d<bd){bd=d;target=en;}
       }
-      if(target){t.cd=0.4;turretFire(t,target);}
+      if(target){t.cd=SIM.upgrades.secondTurretRow?0.26:0.4;turretFire(t,target,t.heavy?2:1);}
     }
   }
 
@@ -302,9 +304,9 @@ function simUpdate(dt){
 
 function resolveDraftTimeouts(){
   if(!SIM||SIM.over)return;
-  // Squad draft has no timeout — it only ever resolves once every human has
-  // voted (see resolveSquadDraft, ticked in simUpdate).
-  if(SIM.phase==='personalDraft'&&SIM.phaseTimer<=0){
+  if(SIM.phase==='squadDraft'&&SIM.phaseTimer<=0){
+    resolveSquadDraft(true);
+  }else if(SIM.phase==='personalDraft'&&SIM.phaseTimer<=0){
     finishPersonalDrafts(true);
   }else if(SIM.phase==='evolution'&&SIM.phaseTimer<=0){
     finishEvolutions(true);

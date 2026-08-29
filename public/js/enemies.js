@@ -171,21 +171,33 @@ function stepProjectiles(dt){
     for(const en of SIM.enemies){
       if(!en.alive||pr.dead)continue;
       if(dist2(pr.x,pr.y,en.x,en.y)<(en.radius+4)*(en.radius+4)){
-        const isCrit=Math.random()<pr.critChance;
+        const owner=pr.ownerPid>0?SIM.players.find(p=>p.pid===pr.ownerPid):null;
+        // NK: Ambush Predator guarantees a crit on the first shot after a dash;
+        // Phantom Predator (legendary) also grants full pierce on that same shot.
+        let isCrit=Math.random()<pr.critChance;
+        if(owner&&owner._dashCritPerk&&owner._dashCritWindow>0){isCrit=true;owner._dashCritWindow=0;}
+        let apexPierce=false;
+        if(owner&&owner._dashApexPerk&&owner._dashApexWindow>0){isCrit=true;apexPierce=true;owner._dashApexWindow=0;}
         let dmg=pr.dmg;
-        if(isCrit)dmg*=1.8;
-        // T-Cell perk: bonus damage to targets already pierced by this shot
-        if(pr.hitCount>0&&pr.ownerPid>0){
-          const owner=SIM.players.find(p=>p.pid===pr.ownerPid);
-          if(owner&&owner._pierceDmg)dmg*=owner._pierceDmg;
+        if(isCrit)dmg*=1.8*(owner&&owner._critDmgMult?owner._critDmgMult:1);
+        // T-Cell: bonus damage to targets already pierced by this shot, and
+        // Focused Beam's bonus applies only to the very first target hit.
+        if(pr.hitCount>0&&owner){
+          if(owner._pierceDmg)dmg*=owner._pierceDmg;
+          if(owner._lancePerk)dmg=pr.dmg*(isCrit?1.8*(owner._critDmgMult||1):1); // Enzyme Lance: no falloff on pierced hits
+        }else if(pr.hitCount===0&&owner&&owner._firstHitDmg){
+          dmg*=owner._firstHitDmg;
         }
+        // NK: Bloodlust Cascade fire-rate handled in fireWeapon; Executioner's Strike checked here
+        if(isCrit&&owner&&owner._executionerPerk&&en.hp/en.hpMax<0.25)dmg=en.hp+9999;
         pr.hitCount++;
         damageEnemy(en,dmg,{crit:isCrit,shooterPid:pr.ownerPid});
         ev({k:'spark',x:pr.x,y:pr.y,color:pr.color});
         if(pr.knockback&&!en.isBoss){
+          const kbMult=owner&&owner._knockbackMult?owner._knockbackMult:1;
           const ka=Math.atan2(pr.vy,pr.vx);
-          en.x+=Math.cos(ka)*pr.knockback*0.14;
-          en.y+=Math.sin(ka)*pr.knockback*0.14;
+          en.x+=Math.cos(ka)*pr.knockback*kbMult*0.14;
+          en.y+=Math.sin(ka)*pr.knockback*kbMult*0.14;
         }
         if(pr.splash>0){
           ev({k:'splash',x:en.x,y:en.y,r:pr.splash,color:pr.color});
@@ -194,7 +206,13 @@ function stepProjectiles(dt){
             if(dist(other.x,other.y,en.x,en.y)<pr.splash)damageEnemy(other,pr.dmg*0.5,{shooterPid:pr.ownerPid});
           }
         }
-        if(pr.pierce>0)pr.pierce--;else pr.dead=true;
+        // Bioluminescent Cascade (legendary, squad-wide): 25% chance on a
+        // kill to chain a spark to a nearby enemy for 60% of this hit's dmg
+        if(en.hp<=0&&SIM.upgrades.bioluminescence&&Math.random()<0.25){
+          const chainTarget=SIM.enemies.find(o=>o!==en&&o.alive&&dist2(o.x,o.y,en.x,en.y)<180*180);
+          if(chainTarget){damageEnemy(chainTarget,dmg*0.6,{shooterPid:pr.ownerPid});ev({k:'spark',x:chainTarget.x,y:chainTarget.y,color:'#ffd166'});}
+        }
+        if(pr.pierce>0||apexPierce)pr.pierce=apexPierce?99:pr.pierce-1;else pr.dead=true;
         break;
       }
     }

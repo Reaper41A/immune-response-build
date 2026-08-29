@@ -182,7 +182,7 @@ function openDraftScreen(phase){
   const panel=$('screenDraft');
   const title=$('draftTitle'),sub=$('draftSub'),note=$('draftNote');
   const actions=$('draftActions'),skipBtn=$('btnSkipDraft');
-  panel.classList.toggle('no-timer',phase==='squadDraft');
+  panel.classList.remove('no-timer'); // every draft phase now runs on a countdown
   // Personal-perk and evolution drafts are select-and-lock with no button —
   // nothing single-handedly closes those for the group either, since an
   // unpicked slot just times out and is skipped for that one player only.
@@ -193,7 +193,7 @@ function openDraftScreen(phase){
   if(phase==='squadDraft'){
     title.textContent='SQUAD DRAFT';title.style.color='var(--gold)';
     sub.textContent='One shared upgrade, bought with squad EP.';
-    note.innerHTML='Click a card to lock in your vote, or Skip if the squad would rather save EP. This is a <b>group decision</b> — it resolves once <b>everyone</b> has voted. No timer, no rush.';
+    note.innerHTML='Click a card to lock in your vote, or Skip if the squad would rather save EP. This is a <b>group decision</b> — it resolves once <b>everyone</b> has voted, or when the timer runs out (unvoted squadmates count as a skip).';
     skipBtn.classList.remove('picked');
     skipBtn.disabled=false;
   }else if(phase==='personalDraft'){
@@ -224,8 +224,11 @@ function renderDraftList(votesMap){
     const cost=draftKind==='squadDraft'?scaledCost(meta,wave):0;
     const afford=draftKind!=='squadDraft'||ep>=cost;
     const card=document.createElement('div');
-    card.className='upgrade-card'+(draftSelId===id?' picked':'')+(afford?'':' disabled');
-    card.style.setProperty('--oc',draftKind==='squadDraft'?CAT_COLOR[meta.cat]:CLASSES[App.myClass].color);
+    const rarity=meta.rarity||'common';
+    // Rarity now drives the card's accent color/glow (legendary=gold pops
+    // hardest); category is still shown as a small text tag on squad cards.
+    card.className='upgrade-card rarity-'+rarity+(draftSelId===id?' picked':'')+(afford?'':' disabled');
+    card.style.setProperty('--oc',RARITY_COLOR[rarity]);
     const costHtml=draftKind==='squadDraft'
       ?(afford?`<div class="upgrade-cost">◈${cost}</div>`:`<div class="upgrade-cost cant">NEED ◈${cost}</div>`)
       :'';
@@ -239,8 +242,18 @@ function renderDraftList(votesMap){
         }).join('')+'</div>';
       }
     }
+    // {amt} in a repeatable card's desc resolves to THIS specific stack's
+    // diminishing-returns amount, plus a "(n/max)" counter so the squad can
+    // see at a glance how close a card is to capping out.
+    let desc=meta.desc;
+    if(meta.stack&&draftKind==='squadDraft'){
+      const amt=nextStackAmount(meta);
+      const n=upgStacks(meta.id);
+      desc=desc.replace('{amt}',amt)+` <span class="stack-count">(${n+1}/${meta.stack.max})</span>`;
+    }
+    const rarityBadge=`<span class="rarity-badge" style="color:${RARITY_COLOR[rarity]}">${RARITY_LABEL[rarity]}</span>`;
     card.innerHTML=`<div class="num-key">${idx+1}</div><div class="upgrade-icon">${meta.icon}</div>`+
-      `<div class="upgrade-body"><div class="upgrade-name">${meta.name}</div><div class="upgrade-desc">${meta.desc}${meta.cat?` · <span style="color:${CAT_COLOR[meta.cat]}">${meta.cat}</span>`:''}</div></div>`+
+      `<div class="upgrade-body"><div class="upgrade-name">${meta.name} ${rarityBadge}</div><div class="upgrade-desc">${desc}${meta.cat?` · <span style="color:${CAT_COLOR[meta.cat]}">${meta.cat}</span>`:''}</div></div>`+
       costHtml+votesHtml;
     card.addEventListener('click',()=>selectDraftOption(id,afford));
     list.appendChild(card);
@@ -290,22 +303,17 @@ function syncDraftScreens(view){
     const showingThisPhase=App.screen==='draft'&&draftKind===ph;
     if(!showingThisPhase&&!(App.screen!=='draft'&&draftLocalDone&&draftKind===ph))openDraftScreen(ph);
     if(App.screen==='draft'){
+      const t=Math.max(0,Math.ceil(view.phaseLeft));
+      $('draftTimerNum').textContent=t+'s';
+      $('draftTimerFill').style.width=(clamp(view.phaseLeft/Math.max(1,view.phaseDur),0,1)*100)+'%';
+      const urgent=view.phaseLeft<=5;
+      $('draftTimerFill').classList.toggle('urgent',urgent);
+      $('draftTimerNum').classList.toggle('urgent',urgent);
       if(ph==='squadDraft'){
-        // Group decision — no countdown to show or race against.
-        $('draftTimerNum').textContent='';
-        $('draftTimerFill').style.width='100%';
-        $('draftTimerFill').classList.remove('urgent');
-        $('draftTimerNum').classList.remove('urgent');
         const votedCount=(view.players||[]).filter(p=>p.h&&view.votes&&view.votes[p.i]!=null).length;
         const humanCount=(view.players||[]).filter(p=>p.h).length;
         $('draftKicker').textContent=`WAVE ${view.wave} CLEARED · ${votedCount}/${humanCount} VOTED`;
       }else{
-        const t=Math.max(0,Math.ceil(view.phaseLeft));
-        $('draftTimerNum').textContent=t+'s';
-        $('draftTimerFill').style.width=(clamp(view.phaseLeft/Math.max(1,view.phaseDur),0,1)*100)+'%';
-        const urgent=view.phaseLeft<=5;
-        $('draftTimerFill').classList.toggle('urgent',urgent);
-        $('draftTimerNum').classList.toggle('urgent',urgent);
         $('draftKicker').textContent='WAVE '+view.wave+' CLEARED';
       }
       const sum=$('draftSummary');

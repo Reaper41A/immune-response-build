@@ -75,6 +75,13 @@ function applyLeak(en){
   let dmg=en.dmg;
   if(SIM.barrierCharges>0){dmg*=0.7;SIM.barrierCharges--;}
   SIM.bodyHp=Math.max(0,SIM.bodyHp-dmg);
+  // Second Wind (legendary, one-time): the first time this run Body HP would
+  // hit 0, survive at 15% instead. Consumed immediately so it can't loop.
+  if(SIM.bodyHp<=0&&SIM.upgrades.secondWindShield){
+    SIM.upgrades.secondWindShield=false;
+    SIM.bodyHp=Math.round(SIM.bodyHpMax*0.15);
+    ev({k:'say',sys:true,text:'Second Wind triggered — the Body survives at 15%!',color:'#ffd166'});
+  }
   SIM.runStats.leaks++;
   SIM.waveStats.leaked++;
   const c=worldCore();
@@ -83,8 +90,9 @@ function applyLeak(en){
 }
 function maybeDamageOrgan(){
   const k=choice(Object.keys(SIM.organs));
+  const chip=Math.round(randi(8,16)*(SIM.upgrades.organShield?0.6:1));
   if(SIM.organs[k]>0){
-    SIM.organs[k]=Math.max(0,SIM.organs[k]-randi(8,16));
+    SIM.organs[k]=Math.max(0,SIM.organs[k]-chip);
     ev({k:'organ',key:k});
     if(SIM.organs[k]<=0&&!SIM.debuffs[k]){
       SIM.debuffs[k]=true;
@@ -100,27 +108,54 @@ function maybeDamageOrgan(){
 }
 
 /* ---------------------------------------------------------------- drafts */
+/* Rarity-weighted draw shared by all three draft pools: roll a tier per
+   slot, draw a random ELIGIBLE card of that tier (falling back a tier at a
+   time if nothing's eligible there), and never repeat a card already
+   offered in this same draft. `pool` is the full card array, `eligibleFn`
+   filters by current game state, `excludeIds` is a running set of ids
+   already placed in this draft's option list (so slot 2 can't just repeat
+   slot 1). Returns null if literally nothing in the whole pool qualifies. */
+function drawRarityCard(pool,eligibleFn,excludeIds){
+  let tier=rollRarity();
+  while(tier){
+    const candidates=pool.filter(c=>c.rarity===tier&&!excludeIds.has(c.id)&&eligibleFn(c));
+    if(candidates.length)return choice(candidates);
+    tier=rarityBelow(tier);
+  }
+  return null;
+}
+function drawDraftOptions(pool,eligibleFn,count){
+  const excludeIds=new Set();
+  const opts=[];
+  for(let i=0;i<count;i++){
+    const card=drawRarityCard(pool,eligibleFn,excludeIds);
+    if(!card)break;
+    excludeIds.add(card.id);
+    opts.push(card.id);
+  }
+  return opts;
+}
 function enterSquadDraft(){
   SIM.phase='squadDraft';
-  const pool=[...UPGRADE_POOL.map(u=>u.id)];
-  const opts=[];
-  while(opts.length<3&&pool.length)opts.push(pool.splice(randi(0,pool.length-1),1)[0]);
+  const opts=drawDraftOptions(UPGRADE_POOL,upgradeEligible,3);
   // Guarantee the squad can always afford at least the cheapest of the three
   // offered cards. Early waves (esp. wave 1) can't realistically earn enough
   // kill EP to afford anything — the draft would silently resolve to
   // "nothing affordable" every single time, which read as a dead/broken
   // screen. This tops EP up to the floor needed, never lowers it.
-  const cheapest=Math.min(...opts.map(id=>scaledCost(UPG_BY_ID[id],SIM.wave)));
+  const cheapest=opts.length?Math.min(...opts.map(id=>scaledCost(UPG_BY_ID[id],SIM.wave))):0;
   if(SIM.ep<cheapest){
     const shortfall=cheapest-SIM.ep;
     SIM.ep=cheapest;
     ev({k:'say',sys:true,text:`Squad short on EP this wave — topped up +${shortfall} so a pick is always affordable`,color:'#ffd166'});
   }
-  // Squad draft is a group decision: everyone selects, nobody can close it
-  // alone. No countdown either — the screen waits as long as it takes for
-  // every human to lock in a choice (or explicitly abstain).
+  // Squad draft is a group decision, but it still needs a timer — without
+  // one, a single AFK/disconnected player (see the lobby/tab-drop issue)
+  // can stall the whole squad's run indefinitely since resolution only
+  // ever fires once everyone has voted. Whoever hasn't voted when time
+  // runs out is treated as an implicit "skip" (see resolveDraftTimeouts).
   SIM.draft={options:opts,votes:{},locked:{}};
-  SIM.phaseTimer=Infinity;SIM.phaseDur=Infinity;
+  SIM.phaseTimer=DRAFT_DURATIONS.squad;SIM.phaseDur=DRAFT_DURATIONS.squad;
   ev({k:'phase',phase:'squadDraft'});
   for(const p of SIM.players){
     if(!p.isBot)continue;
@@ -161,11 +196,14 @@ function allHumansVotedSquad(){
   for(const p of SIM.players){if(p.human&&!SIM.draft.locked[p.pid])return false;}
   return true;
 }
-/* Resolves the group's shared pick once everyone has voted. No single
-   player's action can force this early or skip it for the rest of the squad.
+/* Resolves the group's shared pick once everyone has voted, or once the
+   timer runs out. No single player's action can force this early. Anyone
+   who hasn't voted by the deadline is treated as an implicit skip — same
+   spirit as personal/evolution drafts leaving unpicked slots skipped —
+   so one AFK or disconnected squadmate can't stall the run forever.
    If every human voted skip, or nothing affordable got the most votes, no
    upgrade is bought and EP carries over to the next draft. */
-function resolveSquadDraft(){
+function resolveSquadDraft(timedOut){
   const id=topVotedAffordable();
   const opt=id?UPG_BY_ID[id]:null;
   if(opt){
@@ -178,29 +216,52 @@ function resolveSquadDraft(){
       ev({k:'say',sys:true,text:`Not enough EP for ${opt.name} — draft skipped`,color:'#ff8ea0'});
     }
   }else{
-    ev({k:'say',sys:true,text:'Squad skipped this pick',color:'#7fd6ff'});
+    ev({k:'say',sys:true,text:timedOut?'Squad draft timed out — no pick made':'Squad skipped this pick',color:'#7fd6ff'});
   }
   enterPersonalDrafts();
 }
+/* Repeatable cards (damage/fireRate/moveSpeed/economy/bodyMax/ricochetRounds/
+   thickMembrane/scavengeDrive) store their stack count in SIM.upgrades[id]
+   and read the diminishing-returns amount for THIS stack from the card's
+   own amounts array, so every stack after the first is deliberately weaker
+   — the pool-eligibility check (upgradeEligible/upgMaxed) already keeps a
+   card from being drawn once it hits stack.max, so this never over-applies.
+   One-time cards set a truthy flag in SIM.upgrades[id] so upgradeEligible
+   filters them out of all future draws once bought. */
 function applyUpgrade(id){
+  const upg=UPG_BY_ID[id];
+  const amt=nextStackAmount(upg); // % or flat, per this specific stack
   switch(id){
-    case'healBody':SIM.bodyHp=Math.min(SIM.bodyHpMax,SIM.bodyHp+200);break;
-    case'bodyMax':SIM.bodyHpMax+=150;SIM.bodyHp+=150;break;
-    case'damage':SIM.upgrades.damage=(SIM.upgrades.damage||0)+1;break;
-    case'fireRate':SIM.upgrades.fireRate=(SIM.upgrades.fireRate||0)+1;break;
-    case'economy':SIM.upgrades.economy=(SIM.upgrades.economy||0)+1;break;
-    case'moveSpeed':for(const p of SIM.players)p.speed*=1.1;break;
+    case'healBody':SIM.bodyHp=Math.min(SIM.bodyHpMax,SIM.bodyHp+200);SIM.upgrades.healBody=true;break;
+    case'bodyMax':SIM.bodyHpMax+=amt;SIM.bodyHp+=amt;SIM.upgrades.bodyMax=(SIM.upgrades.bodyMax||0)+1;break;
+    case'damage':SIM.upgrades.damage=(SIM.upgrades.damage||0)+1;SIM.upgrades._dmgPct=(SIM.upgrades._dmgPct||0)+amt;break;
+    case'fireRate':SIM.upgrades.fireRate=(SIM.upgrades.fireRate||0)+1;SIM.upgrades._fireRatePct=(SIM.upgrades._fireRatePct||0)+amt;break;
+    case'economy':SIM.upgrades.economy=(SIM.upgrades.economy||0)+1;SIM.upgrades._economyPct=(SIM.upgrades._economyPct||0)+amt;break;
+    case'moveSpeed':SIM.upgrades.moveSpeed=(SIM.upgrades.moveSpeed||0)+1;for(const p of SIM.players)p.speed*=1+amt/100;break;
     case'turret':
       if(SIM.turrets.length<4){
         const c=worldCore(),a=rand(0,Math.PI*2);
         SIM.turrets.push({x:c.x+Math.cos(a)*170,y:c.y+Math.sin(a)*170,cd:0,range:220});
-      }else{
-        SIM.ep+=scaledCost(UPG_BY_ID[id],SIM.wave);
-        ev({k:'say',sys:true,text:'Turret limit reached (4) — EP refunded',color:'#ffd166'});
       }
       break;
-    case'barrier':SIM.barrierCharges++;break;
-    case'organRepair':repairWorstOrgan();break;
+    case'barrier':SIM.barrierCharges=Math.min(3,SIM.barrierCharges+1);break;
+    case'organRepair':repairWorstOrgan();SIM.upgrades.organRepair=true;break;
+    case'ricochetRounds':SIM.upgrades.ricochetRounds=(SIM.upgrades.ricochetRounds||0)+1;for(const p of SIM.players)p._bounceBonus=(p._bounceBonus||0)+amt;break;
+    case'thickMembrane':SIM.upgrades.thickMembrane=(SIM.upgrades.thickMembrane||0)+1;SIM.upgrades._dmgReducedPct=Math.min(60,(SIM.upgrades._dmgReducedPct||0)+amt);break;
+    case'scavengeDrive':SIM.upgrades.scavengeDrive=(SIM.upgrades.scavengeDrive||0)+1;SIM.upgrades._scavengePct=(SIM.upgrades._scavengePct||0)+amt;break;
+    case'secondTurretRow':SIM.upgrades.secondTurretRow=true;break;
+    case'organShield':SIM.upgrades.organShield=true;break;
+    case'bloodhoundEP':SIM.upgrades.bloodhoundEP=true;break;
+    case'overflowAmmo':SIM.upgrades.overflowAmmo=true;for(const p of SIM.players){p.ammoMax=Math.round(p.ammoMax*1.3);p.ammo=p.ammoMax;}break;
+    case'secondWindShield':SIM.upgrades.secondWindShield=true;break;
+    case'bioluminescence':SIM.upgrades.bioluminescence=true;break;
+    case'hiveMind':SIM.upgrades.hiveMind=true;for(const p of SIM.players)p._cdMult=(p._cdMult||1)*0.8;break;
+    case'lastLine':
+      SIM.upgrades.lastLine=true;
+      {const c=worldCore();
+       for(let i=0;i<2;i++){const a=rand(0,Math.PI*2);SIM.turrets.push({x:c.x+Math.cos(a)*190,y:c.y+Math.sin(a)*190,cd:0,range:240,heavy:true});}}
+      break;
+    case'apexMetabolism':SIM.upgrades.apexMetabolism=true;break;
   }
 }
 function repairWorstOrgan(){
@@ -208,13 +269,18 @@ function repairWorstOrgan(){
   for(const k in SIM.organs)if(SIM.organs[k]<worstV){worstV=SIM.organs[k];worst=k;}
   if(worst){SIM.organs[worst]=100;SIM.debuffs[worst]=false;ev({k:'organ',key:worst});}
 }
+/* Personal perks and class evolutions are permanent, non-repeatable picks —
+   once a player owns one it's tracked in p._ownedPerks / p._ownedEvos and
+   never offered to that player again, so a run can't accumulate duplicate
+   "Extended Focus" style cards from every subsequent draft. */
 function enterPersonalDrafts(){
   SIM.phase='personalDraft';
   SIM.personalDrafts={};
   for(const p of SIM.players){
-    const pool=PERSONAL_PERK_POOL.filter(o=>!o.cls||o.cls===p.cls).map(o=>o.id);
-    const opts=[];
-    while(opts.length<3&&pool.length)opts.push(pool.splice(randi(0,pool.length-1),1)[0]);
+    if(!p._ownedPerks)p._ownedPerks={};
+    const pool=PERSONAL_PERK_POOL.filter(o=>!o.cls||o.cls===p.cls);
+    const eligible=c=>!p._ownedPerks[c.id];
+    const opts=drawDraftOptions(pool,eligible,3);
     SIM.personalDrafts[p.pid]={options:opts,picked:null};
   }
   SIM.phaseTimer=DRAFT_DURATIONS.personal;SIM.phaseDur=DRAFT_DURATIONS.personal;
@@ -225,10 +291,11 @@ function enterEvolutions(){
   SIM.phase='evolution';
   SIM.evolutions={};
   for(const p of SIM.players){
+    if(!p._ownedEvos)p._ownedEvos={};
     const abKey=CLASSES[p.cls].ability.key;
-    const pool=(CLASS_EVOLUTIONS[abKey]||[]).map(e=>e.id);
-    const opts=[];
-    while(opts.length<3&&pool.length)opts.push(pool.splice(randi(0,pool.length-1),1)[0]);
+    const pool=CLASS_EVOLUTIONS[abKey]||[];
+    const eligible=c=>!p._ownedEvos[c.id];
+    const opts=drawDraftOptions(pool,eligible,3);
     SIM.evolutions[p.pid]={options:opts,picked:null};
   }
   SIM.phaseTimer=DRAFT_DURATIONS.evolution;SIM.phaseDur=DRAFT_DURATIONS.evolution;
@@ -242,7 +309,7 @@ function allHumansPicked(map){
 function finishPersonalDrafts(timedOut){
   for(const p of SIM.players){
     const d=SIM.personalDrafts[p.pid];
-    if(d&&d.picked)applyPerk(p,d.picked);
+    if(d&&d.picked){applyPerk(p,d.picked);if(!p._ownedPerks)p._ownedPerks={};p._ownedPerks[d.picked]=true;}
   }
   if(timedOut)ev({k:'say',sys:true,text:'Perk draft timed out — unpicked slots skipped',color:'#93a9b4'});
   if(SIM.wave%EVOLUTION_INTERVAL===0)enterEvolutions();
@@ -254,6 +321,7 @@ function finishEvolutions(timedOut){
     if(d&&d.picked){
       const opt=EVO_BY_ID[d.picked];
       applyEvolution(p,opt.id);
+      if(!p._ownedEvos)p._ownedEvos={};p._ownedEvos[opt.id]=true;
       ev({k:'evolve',name:opt.name,pid:p.pid,ability:CLASSES[p.cls].ability.name});
     }
   }
@@ -271,10 +339,28 @@ function applyPerk(p,id){
     case'p_pickupRange':p._pickupBonus=(p._pickupBonus||0)+14;break;
     case'p_pierce':p._pierceBonus=(p._pierceBonus||0)+1;break;
     case'p_bounce':p._bounceBonus=(p._bounceBonus||0)+2;break;
+    case'p_regen':p._regenPct=(p._regenPct||0)+0.015;break;
+    case'p_lifesteal':p._lifestealFlat=(p._lifestealFlat||0)+2;break;
     case'p_dmg_nk':p._critBonus=(p._critBonus||0)+0.15;break;
+    case'p_nk_critdmg':p._critDmgMult=(p._critDmgMult||1)*1.3;break;
+    case'p_nk_dashcrit':p._dashCritPerk=true;break;
+    case'p_nk_bloodlust':p._bloodlustPerk=true;break;
+    case'p_nk_executioner':p._executionerPerk=true;break;
     case'p_dmg_macrophage':p._splashMult=(p._splashMult||1)*1.4;break;
+    case'p_mac_knockback':p._knockbackMult=(p._knockbackMult||1)*1.5;break;
+    case'p_mac_tauntheal':p._tauntHealPerk=true;break;
+    case'p_mac_bulwark':p.hpMax=Math.round(p.hpMax*1.25);p.hp=Math.round(p.hp*1.25);p.speed*=0.92;break;
+    case'p_mac_retaliate':p._retaliatePerk=true;break;
     case'p_dmg_tcell':p._pierceDmg=(p._pierceDmg||1)*1.18;break;
+    case'p_tcell_focus':p._firstHitDmg=(p._firstHitDmg||1)*1.1;break;
+    case'p_tcell_heatvent':p._heatVentPerk=true;break;
+    case'p_tcell_railgun':p._pierceBonus=(p._pierceBonus||0)+3;break;
+    case'p_tcell_lance':p._lancePerk=true;break;
     case'p_dmg_bcell':p._teamDmgAura=(p._teamDmgAura||0)+0.1;break;
+    case'p_bcell_shield':p._healShieldPerk=true;break;
+    case'p_bcell_reach':p._rangeBonus=(p._rangeBonus||0)+80;break;
+    case'p_bcell_overheal':p._overhealPerk=true;break;
+    case'p_bcell_martyr':p._martyrPerk=true;break;
   }
   ev({k:'perk',name:PERK_BY_ID[id].name,pid:p.pid});
 }
@@ -287,9 +373,24 @@ function applyEvolution(p,id){
     case'ev_taunt_range':p._rangeBonus=(p._rangeBonus||0)+60;break;
     case'ev_heal_range':p._rangeBonus=(p._rangeBonus||0)+80;break;
     case'ev_taunt_shield':p._tauntShieldPerk=true;break;
-    case'ev_od_cd':case'ev_heal_cd':case'ev_dash_cd':p._cdMult=(p._cdMult||1)*0.75;break;
+    case'ev_od_cd':case'ev_heal_cd':case'ev_dash_cd':case'ev_taunt_cd':p._cdMult=(p._cdMult||1)*0.75;break;
     case'ev_od_dmg':p._odDmgPerk=true;break;
     case'ev_dash_dmg':p._dashDmgPerk=true;break;
+    case'ev_od_ammo':p._odNoAmmoPerk=true;break;
+    case'ev_od_pierce':p._odPiercePerk=true;break;
+    case'ev_od_chain':p._odChainPerk=true;break;
+    case'ev_od_apex':p._durBonus=(p._durBonus||0)+4;p._odApexPerk=true;break;
+    case'ev_taunt_thorns':p._tauntThornsPerk=true;break;
+    case'ev_taunt_double':p._tauntDoublePerk=true;break;
+    case'ev_taunt_apex':p._tauntApexPerk=true;break;
+    case'ev_heal_cleanse':p._healCleansePerk=true;break;
+    case'ev_heal_shield':p._healShieldEvoPerk=true;break;
+    case'ev_heal_double':p._healDoublePerk=true;break;
+    case'ev_heal_apex':p._healApexPerk=true;break;
+    case'ev_dash_speed':p._dashSpeedMult=(p._dashSpeedMult||1)*1.3;break;
+    case'ev_dash_reset':p._dashResetPerk=true;break;
+    case'ev_dash_chain':p._dashChainPerk=true;break;
+    case'ev_dash_apex':p._dashApexPerk=true;break;
   }
 }
 function endRun(reason){

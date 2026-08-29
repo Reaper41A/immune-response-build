@@ -136,9 +136,17 @@ function acquireOrRetainTarget(state,player,enemies,firing){
 function onFireReleased(state){state.lockId=null;state.lockRef=null;}
 
 /* ---------------------------------------------------------------- combat */
-function epMult(){return SIM.upgrades.economy?1+0.15*SIM.upgrades.economy:1;}
+/* _dmgPct/_economyPct/_fireRatePct accumulate the diminishing-returns
+   amount from each individual stack (see applyUpgrade/nextStackAmount) —
+   they are NOT stackCount*flatAmount, since later stacks are worth less. */
+function epMult(){
+  let m=1+(SIM.upgrades._economyPct||0)/100;
+  if(SIM.upgrades.bloodhoundEP)m*=1; // elite-kill-only bonus applied at the kill site, not here
+  return m;
+}
 function squadDamageMult(shooter){
-  let m=SIM.upgrades.damage?1+0.12*SIM.upgrades.damage:1;
+  let m=1+(SIM.upgrades._dmgPct||0)/100;
+  if(SIM.upgrades.apexMetabolism)m*=1.25;
   // BODY buff: full +25% above 60% HP, linear taper, gone below 30%
   const pct=SIM.bodyHpMax>0?SIM.bodyHp/SIM.bodyHpMax:0;
   if(pct>=0.6)m*=1.25;
@@ -147,6 +155,7 @@ function squadDamageMult(shooter){
   const bcell=SIM.players.find(p=>p.cls==='bcell'&&p.alive&&p._teamDmgAura&&p.abilityCd<=0);
   if(bcell)m*=1+bcell._teamDmgAura;
   if(shooter&&shooter._overdriveDmg)m*=1.2;
+  if(shooter&&shooter._overhealDmgBuff>0)m*=1.15;
   return m;
 }
 function updateAmmoHeat(sh,dt){

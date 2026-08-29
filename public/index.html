@@ -509,6 +509,23 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .upgrade-desc{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:3px;line-height:1.5;}
 .upgrade-cost{font-family:var(--font-mono);font-size:13px;color:var(--plasma);font-weight:700;white-space:nowrap;}
 .upgrade-cost.cant{color:var(--infect);font-size:10px;}
+.rarity-badge{font-family:var(--font-mono);font-size:8.5px;font-weight:700;letter-spacing:.06em;opacity:.85;vertical-align:middle;}
+.stack-count{color:rgba(255,255,255,.4);}
+/* Rarity-tinted card backgrounds so the tier reads at a glance, on top of
+   the existing --oc-driven left border/glow (now rarity-colored, not
+   category-colored — see renderDraftList). Legendary gets a subtle shimmer
+   so a legendary pull feels like an event, not just a bigger number. */
+.upgrade-card.rarity-elite{background:color-mix(in srgb,var(--oc) 5%,rgba(255,255,255,.03));}
+.upgrade-card.rarity-epic{background:color-mix(in srgb,var(--oc) 8%,rgba(255,255,255,.03));border-left-width:3.5px;}
+.upgrade-card.rarity-legendary{
+  background:color-mix(in srgb,var(--oc) 13%,rgba(255,255,255,.03));
+  border-left-width:4px;box-shadow:0 0 20px -8px var(--oc);
+  animation:legendaryShimmer 2.6s ease-in-out infinite;
+}
+@keyframes legendaryShimmer{
+  0%,100%{box-shadow:0 0 16px -9px var(--oc);}
+  50%{box-shadow:0 0 26px -6px var(--oc);}
+}
 .votes-row{position:absolute;bottom:6px;right:14px;display:flex;gap:3px;align-items:center;}
 .vote-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 5px currentColor;}
 .vote-label{font-family:var(--font-mono);font-size:8px;color:var(--dim);margin-right:2px;}

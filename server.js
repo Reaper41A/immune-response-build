@@ -430,7 +430,7 @@ function onMessage(conn, raw) {
   const rec = conns.get(conn);
 
   switch (msg.t) {
-    case 'hi': break; // name arrives with create/join
+    case 'hi': conn.send({ t: 'hi' }); break; // liveness check from client (e.g. after tab foregrounds)
     case 'create': if (!rec) handleCreate(conn, msg); return;
     case 'join': if (!rec) handleJoin(conn, msg); return;
     case 'rejoin': if (!rec) handleRejoin(conn, msg); return;

@@ -111,17 +111,87 @@ const ROSTER=[
 ];
 const SPAWN_COST={bacteria:3,virus:5,fungi:9,worm_seg:6,toxinsac:5,mycovirus:8,macrophageMimic:9,prion:11,necroticDrifter:8,antigenCluster:10,biofilmWall:16,cytokineStormCloud:12,retrovirus:10,parasite:22};
 
-/* ------------------------------- upgrades / perks / evolutions */
+/* ------------------------------- rarity system
+   Four tiers shared by all three draft pools. Each draft slot rolls a tier
+   independently (weighted), then draws a random eligible card of that tier.
+   If a tier has nothing eligible left (maxed stacks, class mismatch, already
+   owned, unmet prereqs), we fall back a tier rather than reroll blind — a
+   legendary roll with no legendary content available becomes an epic roll,
+   etc., so a slot is never wasted and early waves never dead-end reaching
+   for content that isn't unlocked yet. */
+const RARITY=['common','elite','epic','legendary'];
+const RARITY_WEIGHT={common:0.60,elite:0.27,epic:0.11,legendary:0.02};
+const RARITY_COLOR={common:'#b7c4cc',elite:'#5eb6ff',epic:'#c084fc',legendary:'#ffd166'};
+const RARITY_LABEL={common:'COMMON',elite:'ELITE',epic:'EPIC',legendary:'LEGENDARY'};
+function rollRarity(){
+  const r=Math.random();let acc=0;
+  for(const t of RARITY){acc+=RARITY_WEIGHT[t];if(r<acc)return t;}
+  return'common';
+}
+function rarityBelow(t){const i=RARITY.indexOf(t);return i>0?RARITY[i-1]:null;}
+
+/* ------------------------------- upgrades / perks / evolutions
+   Squad draft: shared upgrades bought with pooled EP, whole-squad group vote.
+   Repeatable cards (damage/fireRate/moveSpeed/economy/turret/barrier) carry
+   maxStacks + a diminishing per-stack scale so no card is a free infinite
+   scale-past-the-enemy-curve button; once a repeatable hits its cap it is
+   filtered out of future draws entirely (see eligibleSquadUpgrades). One-time
+   cards (healBody/organRepair) are conditionally eligible — they simply
+   don't get drawn when there's nothing for them to do, instead of showing up
+   dead. bodyMax and the class-neutral "capstone" legendaries are one-time
+   per run. */
 const UPGRADE_POOL=[
-  {id:'healBody',name:'Medicine Administered',icon:'💉',cat:'survival',cost:120,desc:'Restore 200 Body HP right now'},
-  {id:'bodyMax',name:'Expand Body HP',icon:'❤️',cat:'survival',cost:160,desc:'+150 max Body HP, healed to match'},
-  {id:'damage',name:'Corrosive Enzymes',icon:'🧪',cat:'weapons',cost:90,desc:'+12% weapon damage for the whole squad (stacks)'},
-  {id:'fireRate',name:'Rapid Mitosis',icon:'🔁',cat:'weapons',cost:100,desc:'+8% fire rate for the whole squad (stacks)'},
-  {id:'economy',name:'Antigen Memory',icon:'📈',cat:'economy',cost:110,desc:'+15% Evolution Points earned'},
-  {id:'moveSpeed',name:'Chemotaxis Boost',icon:'💨',cat:'mobility',cost:80,desc:'+10% move speed for the whole squad'},
-  {id:'turret',name:'Antibody Turret',icon:'🗼',cat:'defense',cost:150,desc:'Deploy an auto-firing turret near the Body (max 4)'},
-  {id:'barrier',name:'Barrier Field',icon:'🔮',cat:'defense',cost:130,desc:'Next wave\u2019s leaks deal 30% less damage'},
-  {id:'organRepair',name:'Regenerative Tissue',icon:'🩹',cat:'survival',cost:140,desc:'Fully restore the most damaged organ & clear its debuff'},
+  // ---- COMMON: cheap, small, always relevant early
+  {id:'healBody',name:'Medicine Administered',icon:'💉',cat:'survival',rarity:'common',cost:90,
+    desc:'Restore 200 Body HP right now',oneTime:true,
+    eligible:()=>SIM.bodyHp<SIM.bodyHpMax*0.8},
+  {id:'damage',name:'Corrosive Enzymes',icon:'🧪',cat:'weapons',rarity:'common',cost:90,
+    desc:'+{amt}% weapon damage for the whole squad',stack:{max:5,amounts:[12,9,7,5,3]}},
+  {id:'fireRate',name:'Rapid Mitosis',icon:'🔁',cat:'weapons',rarity:'common',cost:100,
+    desc:'+{amt}% fire rate for the whole squad',stack:{max:5,amounts:[8,6,5,4,3]}},
+  {id:'moveSpeed',name:'Chemotaxis Boost',icon:'💨',cat:'mobility',rarity:'common',cost:80,
+    desc:'+{amt}% move speed for the whole squad',stack:{max:4,amounts:[10,7,5,3]}},
+  {id:'economy',name:'Antigen Memory',icon:'📈',cat:'economy',rarity:'common',cost:110,
+    desc:'+{amt}% Evolution Points earned',stack:{max:4,amounts:[15,11,8,5]}},
+  {id:'barrier',name:'Barrier Field',icon:'🔮',cat:'defense',rarity:'common',cost:110,
+    desc:'+1 charge: next leak deals 30% less damage (max 3 charges)',
+    eligible:()=>SIM.barrierCharges<3},
+  // ---- ELITE: bigger, single dedicated tools
+  {id:'bodyMax',name:'Expand Body HP',icon:'❤️',cat:'survival',rarity:'elite',cost:160,
+    desc:'+150 max Body HP, healed to match',stack:{max:6,amounts:[150,150,150,150,150,150]}},
+  {id:'turret',name:'Antibody Turret',icon:'🗼',cat:'defense',rarity:'elite',cost:150,
+    desc:'Deploy an auto-firing turret near the Body (max 4)',
+    eligible:()=>SIM.turrets.length<4},
+  {id:'organRepair',name:'Regenerative Tissue',icon:'🩹',cat:'survival',rarity:'elite',cost:140,
+    desc:'Fully restore the most damaged organ & clear its debuff',oneTime:true,
+    eligible:()=>Object.values(SIM.organs).some(v=>v<100)},
+  {id:'ricochetRounds',name:'Ricochet Rounds',icon:'💫',cat:'weapons',rarity:'elite',cost:150,
+    desc:'Squad shots bounce off the arena edge +1 additional time',
+    stack:{max:2,amounts:[1,1]}},
+  {id:'thickMembrane',name:'Thickened Membrane',icon:'🛡️',cat:'survival',rarity:'elite',cost:150,
+    desc:'-10% damage taken by all players (stacks)',stack:{max:3,amounts:[10,7,5]}},
+  {id:'scavengeDrive',name:'Scavenger Instinct',icon:'🔍',cat:'economy',rarity:'elite',cost:140,
+    desc:'+20% chance enemies drop ammo pickups',stack:{max:3,amounts:[20,15,10]}},
+  // ---- EPIC: strong, mostly one-shot toolkit pieces
+  {id:'secondTurretRow',name:'Turret Overclock',icon:'⚙️',cat:'defense',rarity:'epic',cost:220,
+    desc:'All deployed turrets fire 35% faster',oneTime:true},
+  {id:'organShield',name:'Organ Ward',icon:'🫀',cat:'survival',rarity:'epic',cost:230,
+    desc:'Organs take 40% less chip damage from leaks for the rest of the run',oneTime:true},
+  {id:'bloodhoundEP',name:'Bloodhound Enzymes',icon:'🧭',cat:'economy',rarity:'epic',cost:210,
+    desc:'+35% EP from elite-tagged kills specifically',oneTime:true},
+  {id:'overflowAmmo',name:'Overflow Vesicles',icon:'🔋',cat:'weapons',rarity:'epic',cost:200,
+    desc:'Squad ammo capacity +30%, all players refilled now',oneTime:true},
+  {id:'secondWindShield',name:'Second Wind',icon:'💠',cat:'survival',rarity:'epic',cost:240,
+    desc:'The next time Body HP would hit 0 this run, it survives at 15% instead (one charge)',oneTime:true},
+  // ---- LEGENDARY: rare, build-defining, unique mechanics not just numbers
+  {id:'bioluminescence',name:'Bioluminescent Cascade',icon:'✨',cat:'weapons',rarity:'legendary',cost:420,
+    desc:'On kill, 25% chance to fire a chain spark that jumps to a nearby enemy for 60% damage',oneTime:true},
+  {id:'hiveMind',name:'Hive Mind Protocol',icon:'🧠',cat:'economy',rarity:'legendary',cost:400,
+    desc:'All squad ability cooldowns -20%, permanently, for every player',oneTime:true},
+  {id:'lastLine',name:'Last Line of Defense',icon:'⚔️',cat:'defense',rarity:'legendary',cost:450,
+    desc:'Deploy 2 heavy sentry turrets (don\u2019t count toward the normal turret cap) that deal double damage',oneTime:true},
+  {id:'apexMetabolism',name:'Apex Metabolism',icon:'🔥',cat:'weapons',rarity:'legendary',cost:440,
+    desc:'+25% squad damage AND +15% fire rate — bypasses normal stacking caps',oneTime:true},
 ];
 const CAT_COLOR={survival:'#8fe36a',weapons:'#ff8ea0',economy:'#3ee8c8',mobility:'#7fd6ff',defense:'#ffd166'};
 const UPG_BY_ID={};UPGRADE_POOL.forEach(u=>UPG_BY_ID[u.id]=u);
@@ -134,52 +204,120 @@ const UPG_BY_ID={};UPGRADE_POOL.forEach(u=>UPG_BY_ID[u.id]=u);
    source of truth for the wave-1 price. +9%/wave, mirroring the roughly
    +25-30% per-wave EP growth from planWave's budget curve but slightly
    gentler so upgrades still get relatively more affordable over a run,
-   just not so fast that wave 5+ drafts become no-brainers. */
+   just not so fast that wave 5+ drafts become no-brainers. Rarer tiers
+   also cost more outright, on top of the wave scaling, so a legendary pull
+   still represents a real spend, not a strictly-better freebie. */
+const RARITY_COST_MULT={common:1,elite:1.35,epic:1.7,legendary:2.1};
 function scaledCost(upg,wave){
-  return Math.round(upg.cost*(1+0.09*Math.max(0,(wave||1)-1)));
+  const base=upg.cost*(RARITY_COST_MULT[upg.rarity]||1);
+  return Math.round(base*(1+0.09*Math.max(0,(wave||1)-1)));
+}
+/* Current stack count for a repeatable upgrade, and whether it's maxed. */
+function upgStacks(id){return(SIM.upgrades[id]||0);}
+function upgMaxed(upg){return!!upg.stack&&upgStacks(upg.id)>=upg.stack.max;}
+/* The % (or flat) amount the NEXT stack of a repeatable card grants —
+   diminishing returns baked into the amounts array so late stacks are
+   real but small, instead of every stack being equally strong forever. */
+function nextStackAmount(upg){
+  if(!upg.stack)return null;
+  const n=upgStacks(upg.id);
+  return upg.stack.amounts[Math.min(n,upg.stack.amounts.length-1)];
+}
+/* A card is eligible for the current game state if: any one-time already-
+   owned flag isn't set, any repeatable isn't maxed, and any custom eligible()
+   predicate (body-hp threshold, organ damaged, turret slots free, etc.)
+   passes. Used both when building draft options and as the tier-fallback
+   filter. */
+function upgradeEligible(upg){
+  if(upg.oneTime&&SIM.upgrades[upg.id])return false;
+  if(upg.stack&&upgMaxed(upg))return false;
+  if(upg.eligible&&!upg.eligible())return false;
+  return true;
 }
 
 const PERSONAL_PERK_POOL=[
-  {id:'p_ammoMax',name:'Larger Vesicles',icon:'🔋',desc:'+25% max ammo capacity'},
-  {id:'p_heatEff',name:'Thermal Regulation',icon:'❄️',desc:'-20% heat generated per shot'},
-  {id:'p_abilityCd',name:'Faster Signaling',icon:'⏱️',desc:'-20% ability cooldown'},
-  {id:'p_speed',name:'Cytoskeleton Boost',icon:'🏃',desc:'+12% personal move speed'},
-  {id:'p_hp',name:'Membrane Reinforcement',icon:'🧬',desc:'+20 max HP, healed to match'},
-  {id:'p_pickupRange',name:'Chemoreceptors',icon:'📡',desc:'Collect organic matter from further away'},
-  {id:'p_pierce',name:'Penetrating Enzyme',icon:'🗡️',desc:'Shots pierce 1 additional enemy'},
-  {id:'p_bounce',name:'Ricochet Membrane',icon:'💫',desc:'Shots bounce off arena edges twice'},
-  {id:'p_dmg_nk',name:'Perforin Overdrive',icon:'🔪',cls:'nk',desc:'+15% crit chance'},
-  {id:'p_dmg_macrophage',name:'Digestive Enzymes',icon:'💥',cls:'macrophage',desc:'+40% splash radius on shotgun hits'},
-  {id:'p_dmg_tcell',name:'Cytotoxic Payload',icon:'☣️',cls:'tcell',desc:'+18% damage to pierced targets'},
-  {id:'p_dmg_bcell',name:'Amplified Antibodies',icon:'✨',cls:'bcell',desc:'+10% squad damage while Heal Burst is ready'},
+  // ---- COMMON: universal, small
+  {id:'p_ammoMax',name:'Larger Vesicles',icon:'🔋',rarity:'common',desc:'+25% max ammo capacity'},
+  {id:'p_heatEff',name:'Thermal Regulation',icon:'❄️',rarity:'common',desc:'-20% heat generated per shot'},
+  {id:'p_abilityCd',name:'Faster Signaling',icon:'⏱️',rarity:'common',desc:'-20% ability cooldown'},
+  {id:'p_speed',name:'Cytoskeleton Boost',icon:'🏃',rarity:'common',desc:'+12% personal move speed'},
+  {id:'p_hp',name:'Membrane Reinforcement',icon:'🧬',rarity:'common',desc:'+20 max HP, healed to match'},
+  {id:'p_pickupRange',name:'Chemoreceptors',icon:'📡',rarity:'common',desc:'Collect organic matter from further away'},
+  // ---- ELITE: universal, stronger single tools
+  {id:'p_pierce',name:'Penetrating Enzyme',icon:'🗡️',rarity:'elite',desc:'Shots pierce 1 additional enemy'},
+  {id:'p_bounce',name:'Ricochet Membrane',icon:'💫',rarity:'elite',desc:'Shots bounce off arena edges twice'},
+  {id:'p_regen',name:'Cellular Repair',icon:'💚',rarity:'elite',desc:'Regenerate 1.5% max HP per second while out of combat'},
+  {id:'p_lifesteal',name:'Necrotrophic Feed',icon:'🩸',rarity:'elite',desc:'Killing an enemy heals you for 2 HP'},
+  // ---- Macrophage (Tank) tree
+  {id:'p_dmg_macrophage',name:'Digestive Enzymes',icon:'💥',cls:'macrophage',rarity:'common',desc:'+40% splash radius on shotgun hits'},
+  {id:'p_mac_knockback',name:'Concussive Burst',icon:'👊',cls:'macrophage',rarity:'common',desc:'+50% shotgun knockback'},
+  {id:'p_mac_tauntheal',name:'Aggro Metabolism',icon:'🛡️',cls:'macrophage',rarity:'elite',desc:'Regenerate 3% max HP per second while Taunt is active'},
+  {id:'p_mac_bulwark',name:'Living Bulwark',icon:'🧱',cls:'macrophage',rarity:'epic',desc:'+25% max HP, but -8% move speed'},
+  {id:'p_mac_retaliate',name:'Phagocytic Retaliation',icon:'☠️',cls:'macrophage',rarity:'legendary',desc:'Enemies taunted by you take 15% more damage from the whole squad'},
+  // ---- T-Cell (DPS) tree
+  {id:'p_dmg_tcell',name:'Cytotoxic Payload',icon:'☣️',cls:'tcell',rarity:'common',desc:'+18% damage to pierced targets'},
+  {id:'p_tcell_focus',name:'Focused Beam',icon:'🎯',cls:'tcell',rarity:'common',desc:'+10% damage to the first enemy hit each shot'},
+  {id:'p_tcell_heatvent',name:'Heat Venting',icon:'♨️',cls:'tcell',rarity:'elite',desc:'Overdrive also purges all current heat on activation'},
+  {id:'p_tcell_railgun',name:'Railgun Focus',icon:'🚀',cls:'tcell',rarity:'epic',desc:'+3 pierce, -20% projectile spread'},
+  {id:'p_tcell_lance',name:'Enzyme Lance',icon:'⚡',cls:'tcell',rarity:'legendary',desc:'Beam shots deal full damage to every enemy pierced instead of falling off'},
+  // ---- B-Cell (Support) tree
+  {id:'p_dmg_bcell',name:'Amplified Antibodies',icon:'✨',cls:'bcell',rarity:'common',desc:'+10% squad damage while Heal Burst is ready'},
+  {id:'p_bcell_shield',name:'Antibody Shielding',icon:'🔵',cls:'bcell',rarity:'common',desc:'Heal Burst also grants allies a 20 HP shield'},
+  {id:'p_bcell_reach',name:'Wide Broadcast',icon:'📶',cls:'bcell',rarity:'elite',desc:'+25% weapon range'},
+  {id:'p_bcell_overheal',name:'Antibody Surplus',icon:'💫',cls:'bcell',rarity:'epic',desc:'Heal Burst overheal converts to a temporary 15% damage buff for 6s'},
+  {id:'p_bcell_martyr',name:'Selfless Cascade',icon:'👼',cls:'bcell',rarity:'legendary',desc:'When Heal Burst is used, fully revive the lowest-HP downed ally if any exist'},
+  // ---- Natural Killer (Assassin) tree
+  {id:'p_dmg_nk',name:'Perforin Overdrive',icon:'🔪',cls:'nk',rarity:'common',desc:'+15% crit chance'},
+  {id:'p_nk_critdmg',name:'Serrated Granules',icon:'🗡️',cls:'nk',rarity:'common',desc:'+30% critical hit damage'},
+  {id:'p_nk_dashcrit',name:'Ambush Predator',icon:'💨',cls:'nk',rarity:'elite',desc:'The first shot after a Dash is a guaranteed critical hit'},
+  {id:'p_nk_bloodlust',name:'Bloodlust Cascade',icon:'🩸',cls:'nk',rarity:'epic',desc:'Each kill grants +2% fire rate for 4s, stacking up to 5 times'},
+  {id:'p_nk_executioner',name:'Executioner\u2019s Strike',icon:'💀',cls:'nk',rarity:'legendary',desc:'Critical hits against enemies below 25% HP instantly execute them'},
 ];
 const PERK_BY_ID={};PERSONAL_PERK_POOL.forEach(p=>PERK_BY_ID[p.id]=p);
 
 const EVOLUTION_INTERVAL=3;
 const CLASS_EVOLUTIONS={
   taunt:[
-    {id:'ev_taunt_dur',name:'Prolonged Taunt',icon:'⏳',desc:'Taunt duration +1.5s'},
-    {id:'ev_taunt_range',name:'Wider Broadcast',icon:'📶',desc:'Taunt pull radius +60'},
-    {id:'ev_taunt_shield',name:'Protective Aggro',icon:'🛡️',desc:'Taunting grants 30% damage resistance while active'},
+    {id:'ev_taunt_dur',name:'Prolonged Taunt',icon:'⏳',rarity:'common',desc:'Taunt duration +1.5s'},
+    {id:'ev_taunt_range',name:'Wider Broadcast',icon:'📶',rarity:'common',desc:'Taunt pull radius +60'},
+    {id:'ev_taunt_cd',name:'Faster Recovery',icon:'🔁',rarity:'common',desc:'Taunt cooldown -20%'},
+    {id:'ev_taunt_shield',name:'Protective Aggro',icon:'🛡️',rarity:'elite',desc:'Taunting grants 30% damage resistance while active'},
+    {id:'ev_taunt_thorns',name:'Reactive Membrane',icon:'🦔',rarity:'elite',desc:'Enemies taunted by you take 15% more damage'},
+    {id:'ev_taunt_double',name:'Split Signal',icon:'📡',rarity:'epic',desc:'Taunt can be re-activated once more before going on cooldown'},
+    {id:'ev_taunt_apex',name:'Absolute Aggro',icon:'👑',rarity:'legendary',desc:'While Taunt is active, you take 60% less damage and reflect 20% of it back'},
   ],
   overdrive:[
-    {id:'ev_od_dur',name:'Extended Focus',icon:'⏳',desc:'Overdrive duration +1.5s'},
-    {id:'ev_od_cd',name:'Rapid Recovery',icon:'🔁',desc:'Overdrive cooldown -25%'},
-    {id:'ev_od_dmg',name:'Enzyme Surge',icon:'⚡',desc:'Overdrive also grants +20% damage while active'},
+    {id:'ev_od_dur',name:'Extended Focus',icon:'⏳',rarity:'common',desc:'Overdrive duration +1.5s'},
+    {id:'ev_od_cd',name:'Rapid Recovery',icon:'🔁',rarity:'common',desc:'Overdrive cooldown -25%'},
+    {id:'ev_od_ammo',name:'Efficient Cycling',icon:'🔋',rarity:'common',desc:'Overdrive no longer consumes ammo'},
+    {id:'ev_od_dmg',name:'Enzyme Surge',icon:'⚡',rarity:'elite',desc:'Overdrive also grants +20% damage while active'},
+    {id:'ev_od_pierce',name:'Overcharged Beam',icon:'🗡️',rarity:'elite',desc:'+2 pierce while Overdrive is active'},
+    {id:'ev_od_chain',name:'Resonant Cascade',icon:'🔗',rarity:'epic',desc:'While Overdrive is active, killing an enemy resets 15% of the cooldown'},
+    {id:'ev_od_apex',name:'Absolute Zero Heat',icon:'👑',rarity:'legendary',desc:'Overdrive duration doubled, and firing during it slowly heals nearby allies'},
   ],
   heal:[
-    {id:'ev_heal_amt',name:'Concentrated Dose',icon:'💉',desc:'Heal Burst restores 50% more'},
-    {id:'ev_heal_range',name:'Broadcast Signal',icon:'📡',desc:'Heal Burst range +80'},
-    {id:'ev_heal_cd',name:'Fast Synthesis',icon:'🔁',desc:'Heal Burst cooldown -25%'},
+    {id:'ev_heal_amt',name:'Concentrated Dose',icon:'💉',rarity:'common',desc:'Heal Burst restores 50% more'},
+    {id:'ev_heal_range',name:'Broadcast Signal',icon:'📡',rarity:'common',desc:'Heal Burst range +80'},
+    {id:'ev_heal_cd',name:'Fast Synthesis',icon:'🔁',rarity:'common',desc:'Heal Burst cooldown -25%'},
+    {id:'ev_heal_cleanse',name:'Detox Pulse',icon:'🧪',rarity:'elite',desc:'Heal Burst also clears one damaged-organ debuff if any is active'},
+    {id:'ev_heal_shield',name:'Antibody Barrier',icon:'🔵',rarity:'elite',desc:'Heal Burst grants allies a temporary shield equal to 25% of the heal'},
+    {id:'ev_heal_double',name:'Dual Synthesis',icon:'✨',rarity:'epic',desc:'Heal Burst can be stored as 2 charges'},
+    {id:'ev_heal_apex',name:'Miracle Cascade',icon:'👑',rarity:'legendary',desc:'Heal Burst also fully revives one downed ally at half HP'},
   ],
   dash:[
-    {id:'ev_dash_dur',name:'Extended Invulnerability',icon:'⏳',desc:'Dash invulnerability +0.2s'},
-    {id:'ev_dash_cd',name:'Fast Twitch',icon:'🔁',desc:'Dash cooldown -25%'},
-    {id:'ev_dash_dmg',name:'Piercing Strike',icon:'🗡️',desc:'Dashing through an enemy damages it'},
+    {id:'ev_dash_dur',name:'Extended Invulnerability',icon:'⏳',rarity:'common',desc:'Dash invulnerability +0.2s'},
+    {id:'ev_dash_cd',name:'Fast Twitch',icon:'🔁',rarity:'common',desc:'Dash cooldown -25%'},
+    {id:'ev_dash_speed',name:'Explosive Burst',icon:'💨',rarity:'common',desc:'Dash travel distance +30%'},
+    {id:'ev_dash_dmg',name:'Piercing Strike',icon:'🗡️',rarity:'elite',desc:'Dashing through an enemy damages it'},
+    {id:'ev_dash_reset',name:'Kill Momentum',icon:'🔁',rarity:'elite',desc:'Killing an enemy within 1s of dashing refunds 40% of the cooldown'},
+    {id:'ev_dash_chain',name:'Blink Chain',icon:'🔗',rarity:'epic',desc:'Dash can be used twice in a row before going on cooldown'},
+    {id:'ev_dash_apex',name:'Phantom Predator',icon:'👑',rarity:'legendary',desc:'While invulnerable from Dash, your next shot after it is a guaranteed critical hit that pierces all enemies'},
   ],
 };
 const EVO_BY_ID={};Object.values(CLASS_EVOLUTIONS).flat().forEach(e=>EVO_BY_ID[e.id]=e);
 
-// squad is unused now — squadDraft has no timer, it's a group vote (see waves.js enterSquadDraft)
+// squad: timeout for the shared body-draft vote — group decision, but capped
+// so one AFK/disconnected squadmate can't stall the run forever (unvoted
+// members count as an implicit skip once time runs out; see resolveSquadDraft)
 const DRAFT_DURATIONS={squad:20,personal:25,evolution:20};
 const RESPAWN_SECONDS=8;
