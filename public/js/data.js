@@ -16,27 +16,27 @@
 const CLASSES={
   macrophage:{name:'Macrophage',icon:'🛡️',color:'#7fd6ff',role:'Tank',
     desc:'High HP, spread shotgun. Taunt drags enemies onto you.',
-    hp:180,speed:118,range:220,weapon:'phagoShotgun',
-    ability:{key:'taunt',name:'Taunt',icon:'📣',desc:'Pull nearby enemies to you for 2.5s',cd:14,duration:2.5}},
+    hp:250,speed:90,range:220,weapon:'phagoShotgun',
+    ability:{key:'taunt',name:'Taunt',icon:'📣',desc:'Pull nearby enemies to you for 3s',cd:15,duration:3.0}},
   tcell:{name:'T-Cell',icon:'🎯',color:'#3ee8c8',role:'DPS',
     desc:'Precise piercing rifle. Overdrive: +60% fire rate, no heat.',
-    hp:120,speed:150,range:320,weapon:'enzymeBeam',
-    ability:{key:'overdrive',name:'Overdrive',icon:'⚙️',desc:'+60% fire rate, no heat for 4s',cd:16,duration:4}},
+    hp:90,speed:70,range:350,weapon:'enzymeBeam',
+    ability:{key:'overdrive',name:'Overdrive',icon:'⚙️',desc:'+60% fire rate, no heat for 4s',cd:20,duration:4}},
   bcell:{name:'B-Cell',icon:'✚',color:'#ffd166',role:'Support',
     desc:'Antibody blaster. Heal Burst repairs allies + Body HP.',
-    hp:100,speed:145,range:300,weapon:'antibodyBlaster',
-    ability:{key:'heal',name:'Heal Burst',icon:'💠',desc:'Heals nearby allies 40 HP + 60 Body HP',cd:20,duration:0}},
+    hp:100,speed:145,range:260,weapon:'antibodyBlaster',
+    ability:{key:'heal',name:'Heal Burst',icon:'💠',desc:'Heals nearby allies 60 HP + 80 Body HP',cd:10,duration:0}},
   nk:{name:'Natural Killer',icon:'⚡',color:'#c084fc',role:'Assassin',
     desc:'Dual SMGs, crit-focused. Dash grants brief invulnerability.',
-    hp:90,speed:185,range:380,weapon:'dualSmg',
-    ability:{key:'dash',name:'Dash',icon:'💨',desc:'Burst forward, brief invulnerability',cd:8,duration:0.25}},
+    hp:90,speed:185,range:290,weapon:'dualSmg',
+    ability:{key:'dash',name:'Dash',icon:'💨',desc:'Burst forward, brief invulnerability',cd:10,duration:0.25}},
 };
 
 const WEAPONS={
-  antibodyBlaster:{name:'Antibody Blaster',dmg:9,rate:0.14,spread:0.05,speed:640,pierce:0,color:'#7fd6ff',proj:1,ammoMax:36,heatPerShot:0.05,heatDecay:0.45,overheatLock:1.4},
-  enzymeBeam:{name:'Enzyme Beam',dmg:14,rate:0.18,spread:0.015,speed:900,pierce:3,color:'#3ee8c8',proj:1,ammoMax:28,heatPerShot:0.065,heatDecay:0.4,overheatLock:1.5},
-  phagoShotgun:{name:'Phagocytosis Shotgun',dmg:8,rate:0.55,spread:0.34,speed:560,pierce:0,color:'#7fd6ff',proj:6,knockback:60,ammoMax:14,heatPerShot:0.13,heatDecay:0.35,overheatLock:1.6},
-  dualSmg:{name:'Dual SMG',dmg:6,rate:0.075,spread:0.12,speed:700,pierce:0,color:'#c084fc',proj:1,critChance:0.22,ammoMax:44,heatPerShot:0.045,heatDecay:0.5,overheatLock:1.3},
+  antibodyBlaster:{name:'Antibody Blaster',dmg:9,rate:0.20,spread:0.05,speed:640,pierce:0,color:'#7fd6ff',proj:1,ammoMax:36,heatPerShot:0.05,heatDecay:0.45,overheatLock:1.4},
+  enzymeBeam:{name:'Enzyme Beam',dmg:50,rate:1.0,spread:0.015,speed:900,pierce:3,color:'#3ee8c8',proj:1,ammoMax:28,heatPerShot:0.065,heatDecay:0.4,overheatLock:1.5},
+  phagoShotgun:{name:'Phagocytosis Shotgun',dmg:6,rate:0.60,spread:0.29,speed:560,pierce:0,color:'#7fd6ff',proj:6,knockback:60,ammoMax:14,heatPerShot:0.13,heatDecay:0.35,overheatLock:1.6},
+  dualSmg:{name:'Dual SMG',dmg:4,rate:0.065,spread:0.12,speed:700,pierce:0,color:'#c084fc',proj:1,critChance:0.32,ammoMax:44,heatPerShot:0.045,heatDecay:0.5,overheatLock:1.3},
 };
 const SHOT_SFX={phagoShotgun:'shot_shotgun',enzymeBeam:'shot_beam',dualSmg:'shot_smg',antibodyBlaster:'shot_blaster'};
 

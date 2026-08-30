@@ -60,12 +60,34 @@ const CHANGELOG=[
       ],
       changed:[
         'Personal perks and ability evolutions now track what you\u2019ve already picked, so a run can never offer you an exact duplicate that wasn\u2019t meant to stack.',
-        'Cards that hit their stack cap or become irrelevant (full HP, no damaged organ, a maxed-out turret) now drop out of the draft pool automatically instead of wasting a pick.'
+        'Cards that hit their stack cap or become irrelevant (full HP, no damaged organ, a maxed-out turret) now drop out of the draft pool automatically instead of wasting a pick.',
+        'B-Cell re-spec\u2019d toward a pure healer: shorter range and slower Antibody Blaster, but Heal Burst hits much harder and comes back much faster.'
       ],
       nerfs:[
-        'Damage, fire rate, economy, and move-speed upgrades now cap at 4\u20136 stacks with diminishing returns per stack, instead of scaling forever \u2014 this was the main fix for squads outgrowing what enemies could keep up with on long runs.'
+        'Damage, fire rate, economy, and move-speed upgrades now cap at 4\u20136 stacks with diminishing returns per stack, instead of scaling forever \u2014 this was the main fix for squads outgrowing what enemies could keep up with on long runs.',
+        'Macrophage move speed 118\u219290.',
+        'Phagocytosis Shotgun damage per pellet 8\u21926, and fire rate slowed 0.55s\u21920.60s between shots.',
+        'Taunt cooldown 14s\u219215s.',
+        'T-Cell HP 120\u219290.',
+        'T-Cell move speed 150\u219270 \u2014 now the slowest class in the game.',
+        'Enzyme Beam reworked from a rapid-fire weapon (14 dmg every 0.18s) into a slow, hard-hitting burst weapon (50 dmg every 1.0s).',
+        'Overdrive cooldown 16s\u219220s.',
+        'B-Cell range 300\u2192260.',
+        'Antibody Blaster fire rate slowed 0.14s\u21920.20s between shots.',
+        'Natural Killer range 380\u2192290 \u2014 the largest range cut of any class this patch.',
+        'Dual SMG damage 6\u21924.',
+        'Dash cooldown 8s\u219210s.'
       ],
-      buffs:[],
+      buffs:[
+        'Macrophage HP 180\u2192250.',
+        'Phagocytosis Shotgun spread tightened, making its pellets group up more.',
+        'Taunt duration 2.5s\u21923s.',
+        'T-Cell range 320\u2192350.',
+        'Heal Burst now heals allies for 80 (up from 60) and restores 60 HP to the caster (up from 40).',
+        'Heal Burst cooldown 20s\u219210s \u2014 roughly triples B-Cell\u2019s sustained healing output.',
+        'Dual SMG crit chance 22%\u219232%.',
+        'Piercing Strike (Dash-through damage perk) multiplier \u00d72\u2192\u00d72.6.'
+      ],
       fixed:[]
     }
   },

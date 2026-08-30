@@ -108,7 +108,7 @@ function updateHumanPlayer(p,dt){
       for(const en of SIM.enemies){
         if(!en.alive)continue;
         if(dist2(p.x,p.y,en.x,en.y)<(p.radius+en.radius)*(p.radius+en.radius)){
-          damageEnemy(en,WEAPONS[p.weapon].dmg*2*squadDamageMult(p),{shooterPid:p.pid});
+          damageEnemy(en,WEAPONS[p.weapon].dmg*2.6*squadDamageMult(p),{shooterPid:p.pid});
         }
       }
     }
