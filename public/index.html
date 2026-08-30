@@ -84,9 +84,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bootGate{
   position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:0;
-  background:radial-gradient(ellipse at 50% 42%,rgba(26,44,68,.45),rgba(5,8,15,1) 78%);
+  background:var(--void-deep);
   cursor:pointer;
   transition:opacity .4s ease;
+  overflow:hidden;
+}
+#bootGate::before{
+  content:'';position:absolute;inset:0;z-index:-1;
+  background:radial-gradient(ellipse at 50% 42%,rgba(26,44,68,.45),rgba(5,8,15,1) 78%);
 }
 #bootGate.hidden{display:none;}
 #bootGate.fading{opacity:0;pointer-events:none;}
@@ -138,8 +143,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bgEmblem.lit{animation:bgColorPulse 2.6s ease-in-out .2s infinite;}
 @keyframes bgColorPulse{0%,100%{filter:drop-shadow(0 0 10px rgba(62,232,200,.25));}50%{filter:drop-shadow(0 0 22px rgba(62,232,200,.55));}}
 
+/* Wordmark block sits ABSOLUTELY over the same centered zone as the SVG —
+   not stacked below it in normal flow — so it takes over that exact spot
+   once the emblem's outro finishes fading/scaling it away. Mirrors the
+   source emblem file's .wordBlock exactly. */
+#bootGateWordBlock{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:92vw;max-width:820px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;
+}
 #bootGateWord{
-  position:relative;margin-top:26px;display:flex;flex-direction:column;align-items:center;
   font-family:'Arial Narrow',var(--font-ui);
   font-size:clamp(26px,7vw,52px);font-weight:800;letter-spacing:.05em;
   color:var(--tissue);text-align:center;line-height:1.05;text-transform:uppercase;
@@ -150,7 +164,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 @keyframes bgWordSlam{0%{opacity:0;transform:translateY(6px) scale(1.4);letter-spacing:.3em;}60%{opacity:1;}100%{opacity:1;transform:translateY(0) scale(1);letter-spacing:.06em;}}
 #bootGateWord b{font-weight:800;background:linear-gradient(135deg,var(--plasma),var(--antibody));
   -webkit-background-clip:text;background-clip:text;color:transparent;}
-#bootGateSub{margin-top:12px;font-family:var(--font-mono);font-size:clamp(9px,1.5vw,13px);
+#bootGateSub{margin-top:14px;font-family:var(--font-mono);font-size:clamp(9px,1.5vw,13px);
   letter-spacing:.3em;text-transform:uppercase;color:var(--dim);opacity:0;}
 #bootGateSub.slam{animation:bgRiseIn .5s ease .3s forwards;}
 @keyframes bgRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:.85;transform:translateY(0);}}
@@ -843,9 +857,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         </g>
       </svg>
     </div>
-    <div id="bootGateWord"><b>HOWTZER</b> GAMES</div>
+
+    <!-- Absolutely centered over the SAME zone as the SVG (not stacked below
+         it in flow) so it takes over the exact spot the emblem occupied once
+         the emblem fades out — matches the source emblem file's wordBlock. -->
+    <div id="bootGateWordBlock">
+      <div id="bootGateWord"><b>HOWTZER</b> GAMES</div>
+      <div id="bootGateSub">Studio</div>
+    </div>
   </div>
-  <div id="bootGateSub">Studio</div>
 
   <div id="bootGatePrompt">
     <button id="bootGateBtn" type="button">Ready to Launch</button>

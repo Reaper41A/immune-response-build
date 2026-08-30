@@ -258,9 +258,10 @@ function runBootGate(onDone){
 
   let launched=false,done=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  let bgMaster=null;
 
   function bgTone({freq=440,dur=.3,type='sine',gain=.15,glideTo=null,delay=0,attack=.01}={}){
-    if(!AudioSys.ctx)return;
+    if(!AudioSys.ctx||!bgMaster)return;
     const t0=AudioSys.ctx.currentTime+delay;
     const osc=AudioSys.ctx.createOscillator(),g=AudioSys.ctx.createGain();
     osc.type=type;osc.frequency.setValueAtTime(freq,t0);
@@ -268,11 +269,11 @@ function runBootGate(onDone){
     g.gain.setValueAtTime(0,t0);
     g.gain.linearRampToValueAtTime(gain,t0+attack);
     g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
-    osc.connect(g);g.connect(AudioSys.gain||AudioSys.ctx.destination);
+    osc.connect(g);g.connect(bgMaster);
     osc.start(t0);osc.stop(t0+dur+.05);
   }
   function bgNoise({dur=.12,gain=.18,delay=0,freq=180}={}){
-    if(!AudioSys.ctx)return;
+    if(!AudioSys.ctx||!bgMaster)return;
     const t0=AudioSys.ctx.currentTime+delay;
     const len=Math.max(1,Math.floor(AudioSys.ctx.sampleRate*dur));
     const buf=AudioSys.ctx.createBuffer(1,len,AudioSys.ctx.sampleRate);
@@ -282,55 +283,55 @@ function runBootGate(onDone){
     const flt=AudioSys.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=freq;
     const g=AudioSys.ctx.createGain();g.gain.setValueAtTime(gain,t0);
     g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
-    src.connect(flt);flt.connect(g);g.connect(AudioSys.gain||AudioSys.ctx.destination);
+    src.connect(flt);flt.connect(g);g.connect(bgMaster);
     src.start(t0);
   }
 
   async function playSequence(){
     ring.classList.add('draw');
-    bgTone({freq:180,glideTo:520,dur:.9,gain:.06,attack:.15});
+    bgTone({freq:180,glideTo:520,dur:.9,gain:.11,attack:.15});
     await wait(1250);
 
     ring.classList.add('gapped');
-    bgNoise({dur:.15,gain:.15,freq:900});
+    bgNoise({dur:.15,gain:.27,freq:900});
     await wait(500);
 
     hBarL.classList.add('slide');hBarR.classList.add('slide');
-    bgNoise({dur:.14,gain:.22,freq:220});bgTone({freq:110,dur:.18,type:'triangle',gain:.1});
+    bgNoise({dur:.14,gain:.4,freq:220});bgTone({freq:110,dur:.18,type:'triangle',gain:.18});
     await wait(420);
     hBarM.classList.add('slide');
     await wait(600);
 
     diamond.classList.add('drop');
-    bgNoise({dur:.22,gain:.28,freq:160});bgTone({freq:80,dur:.4,gain:.18,attack:.005});
+    bgNoise({dur:.22,gain:.5,freq:160});bgTone({freq:80,dur:.4,gain:.32,attack:.005});
     await wait(680);
 
     slash.classList.add('flash');
-    bgTone({freq:1400,glideTo:2600,dur:.14,type:'sawtooth',gain:.05});
+    bgTone({freq:1400,glideTo:2600,dur:.14,type:'sawtooth',gain:.09});
     await wait(320);
 
     nodeL.classList.add('pop');nodeR.classList.add('pop');
-    bgTone({freq:1200,dur:.12,gain:.08});
+    bgTone({freq:1200,dur:.12,gain:.14});
     await wait(400);
 
     emblem.classList.add('punch');
     glow.style.transition='opacity .5s ease';glow.style.opacity='1';
     emblem.classList.add('lit');glow.classList.add('pulse');
-    bgTone({freq:220,dur:.6,gain:.16,attack:.01});
-    bgTone({freq:330,dur:.6,gain:.1,delay:.02});
-    bgTone({freq:440,dur:.7,gain:.08,delay:.04});
+    bgTone({freq:220,dur:.6,gain:.29,attack:.01});
+    bgTone({freq:330,dur:.6,gain:.18,delay:.02});
+    bgTone({freq:440,dur:.7,gain:.14,delay:.04});
 
     await wait(1400);
 
     glow.classList.remove('pulse');glow.classList.add('outro');
     sceneWrap.classList.add('outro');
-    bgTone({freq:500,glideTo:120,dur:.45,gain:.12});
+    bgTone({freq:500,glideTo:120,dur:.45,gain:.22});
     await wait(500);
 
     word.classList.add('slam');sub.classList.add('slam');
-    bgTone({freq:440,dur:.5,gain:.1});
-    bgTone({freq:660,dur:.6,gain:.08,delay:.05});
-    bgTone({freq:880,dur:.7,gain:.06,delay:.1});
+    bgTone({freq:440,dur:.5,gain:.18});
+    bgTone({freq:660,dur:.6,gain:.14,delay:.05});
+    bgTone({freq:880,dur:.7,gain:.11,delay:.1});
 
     await wait(1200);
     finish();
@@ -351,8 +352,19 @@ function runBootGate(onDone){
     // gesture requirement, same as the existing pointerdown/keydown
     // listeners in audio.js, just guaranteed instead of incidental.
     AudioSys.init();
+    if(AudioSys.ctx){
+      // Dedicated gain node straight to destination — NOT routed through
+      // AudioSys.gain (which sits at master 0.5 and reflects the in-game
+      // mute toggle). The logo stinger is a one-time studio moment before
+      // the player has even reached a mute button, so it gets its own
+      // fuller-volume bus instead of inheriting the in-run default.
+      bgMaster=AudioSys.ctx.createGain();
+      bgMaster.gain.value=0.9;
+      bgMaster.connect(AudioSys.ctx.destination);
+    }
     promptEl.style.transition='opacity .3s ease';
     promptEl.style.opacity='0';
+    promptEl.style.pointerEvents='none';
     skip.style.transition='opacity .3s ease';
     skip.style.opacity='0';
     playSequence();
