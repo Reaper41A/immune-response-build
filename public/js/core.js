@@ -3,7 +3,7 @@
    ========================================================================== */
 'use strict';
 
-const GAME_VERSION='1.4.2'; // see js/changelog.js (drives in-game CHANGELOG tab)
+const GAME_VERSION='1.4.3'; // see js/changelog.js (drives in-game CHANGELOG tab)
 
 /* ---------------------------------------------------------------- utils */
 const rand=(a,b)=>a+Math.random()*(b-a);

@@ -55,7 +55,12 @@
   --stick-travel:46px;      /* max thumb travel from base center — matches old AIM_MAX/joy max */
   --fixed-ability-size:56px;
   --fixed-stick-gutter:18px; /* base's distance from the screen edge */
-  --fixed-stick-bottom:calc(9vh + env(safe-area-inset-bottom));
+  /* Matches the Floating scheme's fire-btn bottom offset (14vh + 8vmin) so
+     Fixed mode's stick centers sit at the same on-screen height as the
+     buttons they replace, instead of noticeably lower — previously this
+     was only 9vh, which put the stick centers close enough to the bottom
+     edge to be an uncomfortable one-handed thumb reach on most phones. */
+  --fixed-stick-bottom:calc(14vh + 8vmin + env(safe-area-inset-bottom));
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 .hidden{display:none !important;}
@@ -682,11 +687,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 
 /* Landscape phones: less vertical room, so pull the sticks and the fixed
    ability button up a bit and tighten the gap so the ability button can't
-   collide with on-screen HUD (ammo/heat readouts) near the bottom edge. */
+   collide with on-screen HUD (ammo/heat readouts) near the bottom edge.
+   Kept proportionally close to the portrait offset above (not shrunk to a
+   much smaller flat value) so Fixed mode doesn't end up sitting low again
+   specifically in landscape once the portrait fix is applied. */
 @media (orientation:landscape) and (max-height:640px){
   :root{
     --stick-base-r:48px;
-    --fixed-stick-bottom:calc(4vh + env(safe-area-inset-bottom));
+    --fixed-stick-bottom:calc(10vh + 6vmin + env(safe-area-inset-bottom));
     --fixed-ability-size:48px;
   }
 }

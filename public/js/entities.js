@@ -257,11 +257,15 @@ function drawPlayers(view,firingRingFor){
       ctx.restore();
     }
     // aim tracer: a guide line from your cell out to weapon range along
-    // your current aim direction — settings gate: tracer. Only drawn for
-    // the local player while actually aiming/firing (Input.aim is only
-    // guaranteed fresh in that state; see input.js), same condition the
-    // range ring above uses.
-    if(firingRingFor===p.i&&Settings.tracer&&(Input.firing||Input.aiming)){
+    // your current aim direction — settings gate: tracer. Shown for the
+    // local player while aiming OR firing. Note this is intentionally NOT
+    // gated on `firingRingFor` like the range ring above — firingRingFor
+    // only equals the local player's index while Input.firing is true, so
+    // gating on it here would make the "or aiming" half of the condition
+    // below unreachable (aiming-without-firing could never pass), leaving
+    // the tracer effectively dead outside of also-firing. Use the same
+    // local-player check used everywhere else instead (p.i===App.myPid).
+    if(p.i===App.myPid&&Settings.tracer&&(Input.firing||Input.aiming)){
       const aimLen=Math.hypot(Input.aim.x,Input.aim.y);
       if(aimLen>0.01)drawAimTracer(p.x,p.y,Input.aim.x/aimLen,Input.aim.y/aimLen,p.rangeCache||clsRange(p),t);
     }

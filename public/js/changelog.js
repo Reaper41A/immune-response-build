@@ -60,6 +60,23 @@
 
 const CHANGELOG=[
   {
+    version:'1.4.3',
+    date:'2026-08-30',
+    title:'Control & Settings Fixes',
+    sections:{
+      added:[],
+      changed:[
+        'Fixed control scheme: both sticks and the ability button now sit at the same on-screen height as the default Floating scheme\u2019s buttons, in portrait and landscape, instead of sitting noticeably lower and harder to reach one-handed.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'The aim tracer line now actually appears while you\u2019re aiming (not just while firing) \u2014 a leftover condition meant it could only ever show up alongside a shot, making it effectively invisible for anyone who aims before pulling the trigger.',
+        'Background ambience (drifting glow motes and the large organism silhouettes passing overhead) now actually shows up on phones when a graphics setting or preset \u2014 High or Ultra \u2014 has it turned on. It was previously being silently skipped on any phone-class screen regardless of your setting, so picking Ultra there never actually gave you the promised ambience.'
+      ]
+    }
+  },
+  {
     version:'1.4.2',
     date:'2026-08-30',
     title:'Structured Nerfs & Buffs',

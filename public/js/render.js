@@ -68,12 +68,21 @@ function drawBackground(hbBeat){
   // living tissue instead of a painted backdrop.
   if(Settings.veins)drawVeins(hbBeat||0); // settings gate: veins
 
-  if(Settings.backgroundFx){ // settings gate: backgroundFx
+  if(Settings.backgroundFx){ // settings gate: backgroundFx — the player's own
+    // choice is authoritative here. COMPACT/REDUCED no longer silently veto
+    // this the way they used to: Low/Medium presets already set
+    // backgroundFx:false themselves (see settings.js QUALITY_PRESETS), so a
+    // phone on Low/Medium already skips this block via the setting, and a
+    // phone on High/Ultra now actually gets what those presets promise
+    // instead of a silent phone-only downgrade underneath the setting.
+    // REDUCED (prefers-reduced-motion) is a genuine accessibility signal
+    // and still applies — it's a request to minimize motion, not a
+    // performance heuristic, so it stays as a hard override.
     if(!ambientSeeds){
       ambientSeeds=[];
       for(let i=0;i<9;i++)ambientSeeds.push({sx:rand(0,1000),sy:rand(0,1000),r:rand(26,64),hue:i%2});
     }
-    if(!REDUCED&&!COMPACT){ // ambient drift skipped on phones — pure fill-rate cost
+    if(!REDUCED){
       const t=performance.now()/1000;
       ctx.globalAlpha=0.045;
       for(const s of ambientSeeds){
@@ -142,7 +151,7 @@ function drawVeins(hbBeat){
    collision). Pure decoration: makes the tissue read as alive even in a
    quiet moment between spawns. */
 function drawFloatingCells(){
-  if(REDUCED||COMPACT)return; // same budget call as the ambient glow drift above
+  if(REDUCED)return; // backgroundFx itself is checked by the caller; COMPACT no longer vetoes this — see drawBackground
   if(!floatCells){
     floatCells=[];
     for(let i=0;i<7;i++){
@@ -190,8 +199,11 @@ function drawFloatingCells(){
 function drawDriftingOrganisms(dt){
   if(REDUCED||!Settings.backgroundFx)return; // settings gate: backgroundFx
   if(!driftOrganisms)driftOrganisms=[];
-  // spawn a new one occasionally
-  if(!COMPACT&&Math.random()<dt*0.045&&driftOrganisms.length<2){
+  // spawn a new one occasionally — COMPACT no longer blocks this; the
+  // backgroundFx check above (and Low/Medium presets already setting it
+  // false) is the single gate now, so an explicit High/Ultra choice on a
+  // phone actually spawns these instead of being silently skipped.
+  if(Math.random()<dt*0.045&&driftOrganisms.length<2){
     const a=rand(0,Math.PI*2);
     const speed=rand(14,26);
     const R=Math.max(VW,VH)*0.75;
