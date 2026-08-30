@@ -288,6 +288,8 @@ function runBootGate(onDone){
   }
 
   async function playSequence(){
+    await wait(500);
+
     ring.classList.add('draw');
     bgTone({freq:180,glideTo:520,dur:.9,gain:.11,attack:.15});
     await wait(1250);
@@ -363,8 +365,10 @@ function runBootGate(onDone){
       bgMaster.connect(AudioSys.ctx.destination);
     }
     promptEl.style.transition='opacity .3s ease';
-    promptEl.style.opacity='0';
+    $('bootGateBtn').style.animation='none';
+    promptEl.classList.add('leaving');
     promptEl.style.pointerEvents='none';
+    setTimeout(()=>{promptEl.style.display='none';},350);
     skip.style.transition='opacity .3s ease';
     skip.style.opacity='0';
     playSequence();
