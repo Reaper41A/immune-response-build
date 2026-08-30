@@ -1,6 +1,6 @@
 # IMMUNE RESPONSE
 
-**v1.2.0** — see [CHANGELOG.md](./CHANGELOG.md) for what's new, or the
+**v1.4.1** — see [CHANGELOG.md](./CHANGELOG.md) for what's new, or the
 in-game **Changelog** tab (main menu) for the player-facing version with a
 built-in **Nerfs & Buffs** history across all versions.
 

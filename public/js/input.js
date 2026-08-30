@@ -128,18 +128,54 @@ abilityBtnEl.addEventListener('click',e=>{
   pressAbility();
 });
 
+/* Fixed control scheme's ability button — same touch handling as abilityBtn
+   above, separate element because it's positioned differently (locked above
+   the aim stick's fixed base) and the two are mutually exclusive via CSS
+   (only one is ever visible, gated on Settings.controlScheme). */
+const fixedAbilityBtnEl=$('fixedAbilityBtn');
+let fixedAbilityBtnTouchId=null;
+fixedAbilityBtnEl.addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0];
+  if(!isInsideCircularButton(fixedAbilityBtnEl,t.clientX,t.clientY))return;
+  e.preventDefault();e.stopPropagation();
+  fixedAbilityBtnTouchId=t.identifier;
+  pressAbility();
+},{passive:false});
+fixedAbilityBtnEl.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches)if(t.identifier===fixedAbilityBtnTouchId)fixedAbilityBtnTouchId=null;
+});
+
 /* virtual joystick — left half of screen */
 const joyZone=$('joyZone'),joyBase=$('joyBase'),joyStick=$('joyStick');
 let joyTouchId=null,joyActive=false,joyCX=0,joyCY=0;
+
+/* Fixed control scheme: the base's resting position comes from its own CSS
+   (see index.html — #gameWrap.fixed-scheme pins #joyBase/#aimBase to a
+   permanent spot) instead of wherever the finger first lands. Floating mode
+   is unchanged — origin is the touchdown point, base spawns there and is
+   hidden until touched. Everything downstream (dead zone, ramp, outer-ring
+   skill trigger) reads off `cx,cy` the same way in both modes; only how
+   `cx,cy` get set differs. */
+function stickOrigin(zone,base){
+  if(Settings.controlScheme==='fixed'){
+    const zr=zone.getBoundingClientRect(),br=base.getBoundingClientRect();
+    return{x:br.left+br.width/2-zr.left,y:br.top+br.height/2-zr.top};
+  }
+  return null; // floating mode: caller uses the touch point itself
+}
 joyZone.addEventListener('touchstart',e=>{
   e.preventDefault();
   const t=e.changedTouches[0];
   joyTouchId=t.identifier;
   const r=joyZone.getBoundingClientRect();
-  joyCX=t.clientX-r.left;joyCY=t.clientY-r.top;
-  joyBase.style.left=(joyCX-52)+'px';joyBase.style.top=(joyCY-52)+'px';
+  const fixed=stickOrigin(joyZone,joyBase);
+  joyCX=fixed?fixed.x:t.clientX-r.left;joyCY=fixed?fixed.y:t.clientY-r.top;
+  if(!fixed){
+    joyBase.style.left=(joyCX-52)+'px';joyBase.style.top=(joyCY-52)+'px';
+    joyBase.style.display='block';
+  }
   joyStick.style.left=(joyCX-23)+'px';joyStick.style.top=(joyCY-23)+'px';
-  joyBase.style.display='block';joyStick.style.display='block';
+  joyStick.style.display='block';
   joyActive=true;
 },{passive:false});
 joyZone.addEventListener('touchmove',e=>{
@@ -172,7 +208,13 @@ function endJoy(e){
     if(t.identifier!==joyTouchId)continue;
     joyTouchId=null;joyActive=false;
     Input.move={x:0,y:0};
-    joyBase.style.display='none';joyStick.style.display='none';
+    if(Settings.controlScheme==='fixed'){
+      // base stays put — it's a permanent fixture in Fixed mode; only the
+      // thumb needs to spring back to center
+      joyStick.style.left=(joyCX-23)+'px';joyStick.style.top=(joyCY-23)+'px';
+    }else{
+      joyBase.style.display='none';joyStick.style.display='none';
+    }
   }
 }
 joyZone.addEventListener('touchend',endJoy);
@@ -195,11 +237,15 @@ aimZone.addEventListener('touchstart',e=>{
   const t=e.changedTouches[0];
   aimTouchId=t.identifier;
   const r=aimZone.getBoundingClientRect();
-  aimCX=t.clientX-r.left;aimCY=t.clientY-r.top;
-  aimBase.style.left=(aimCX-AIM_MAX)+'px';aimBase.style.top=(aimCY-AIM_MAX)+'px';
-  aimRing.style.left=(aimCX-AIM_RING)+'px';aimRing.style.top=(aimCY-AIM_RING)+'px';
+  const fixed=stickOrigin(aimZone,aimBase);
+  aimCX=fixed?fixed.x:t.clientX-r.left;aimCY=fixed?fixed.y:t.clientY-r.top;
+  if(!fixed){
+    aimBase.style.left=(aimCX-AIM_MAX)+'px';aimBase.style.top=(aimCY-AIM_MAX)+'px';
+    aimRing.style.left=(aimCX-AIM_RING)+'px';aimRing.style.top=(aimCY-AIM_RING)+'px';
+    aimBase.style.display='block';aimRing.style.display='block';
+  }
   aimStick.style.left=(aimCX-23)+'px';aimStick.style.top=(aimCY-23)+'px';
-  aimBase.style.display='block';aimRing.style.display='block';aimStick.style.display='block';
+  aimStick.style.display='block';
   aimPastRing=false;
 },{passive:false});
 aimZone.addEventListener('touchmove',e=>{
@@ -225,7 +271,11 @@ aimZone.addEventListener('touchmove',e=>{
     // Outer-ring skill trigger: edge-detected so holding past the ring
     // fires the skill exactly once, not every frame. Resets on release
     // (touchend below) so the next deliberate drag-out can trigger again.
-    if(d>=AIM_RING&&!aimPastRing){
+    // Fixed control scheme drops this entirely — the skill instead fires
+    // off the always-visible fixed ability button (see CSS: #aimRing is
+    // display:none in Fixed mode), so a drag past AIM_RING there would be
+    // an invisible, undiscoverable trigger with no ring to show for it.
+    if(Settings.controlScheme!=='fixed'&&d>=AIM_RING&&!aimPastRing){
       aimPastRing=true;
       Input.skillEdge=true;
       aimRing.classList.add('triggered');
@@ -237,7 +287,11 @@ function endAim(e){
     if(t.identifier!==aimTouchId)continue;
     aimTouchId=null;aimPastRing=false;
     Input.aiming=false;Input.aim={x:0,y:0};
-    aimBase.style.display='none';aimStick.style.display='none';aimRing.style.display='none';
+    if(Settings.controlScheme==='fixed'){
+      aimStick.style.left=(aimCX-23)+'px';aimStick.style.top=(aimCY-23)+'px';
+    }else{
+      aimBase.style.display='none';aimStick.style.display='none';aimRing.style.display='none';
+    }
     aimRing.classList.remove('triggered');
   }
 }
@@ -252,3 +306,21 @@ document.addEventListener('touchend',e=>{
   if(now-lastTouchEnd<=300&&App.screen==='playing')e.preventDefault();
   lastTouchEnd=now;
 },false);
+
+/* Called by settings.js applyControlScheme() whenever Settings.controlScheme
+   changes — clears any touch currently mid-drag on either stick so a scheme
+   swap mid-run can't leave a stale touchId aiming at a base that just moved. */
+function resetStickTouches(){
+  if(joyTouchId!=null){
+    joyTouchId=null;joyActive=false;Input.move={x:0,y:0};
+    joyBase.style.display=Settings.controlScheme==='fixed'?'block':'none';
+    joyStick.style.display=Settings.controlScheme==='fixed'?'block':'none';
+  }
+  if(aimTouchId!=null){
+    aimTouchId=null;aimPastRing=false;
+    Input.aiming=false;Input.aim={x:0,y:0};
+    aimBase.style.display=Settings.controlScheme==='fixed'?'block':'none';
+    aimStick.style.display=Settings.controlScheme==='fixed'?'block':'none';
+    aimRing.style.display='none';aimRing.classList.remove('triggered');
+  }
+}

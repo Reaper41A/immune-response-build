@@ -14,18 +14,31 @@ const FX={
   parts:[],popups:[],motes:[],warns:[],fakeTraces:[],
   shake:0,flashHurt:0,flashHeal:0,
 };
-function shake(n){if(!REDUCED)FX.shake=Math.min(22,FX.shake+n);}
+function shake(n){if(!REDUCED&&Settings.screenShake)FX.shake=Math.min(22,FX.shake+n);} // settings gate: screenShake
 
 function spawnParticle(x,y,vx,vy,life,size,color,type){
+  if(!Settings.particles)return; // settings gate: particles
   const cap=COMPACT?240:420; // phones: smaller particle budget = less fill rate
   if(FX.parts.length>cap)FX.parts.shift();
   FX.parts.push({x,y,vx,vy,life,maxLife:life,size,color,type});
 }
 function deathBurst(x,y,color,scale=1){
-  const n=Math.round(10*scale);
+  if(!Settings.particles)return; // settings gate: particles
+  const n=Math.round(10*scale*(Settings.particleDensity||1)); // settings gate: particleDensity
   for(let i=0;i<n;i++){
     const a=rand(0,Math.PI*2),s=rand(60,220)*scale;
     spawnParticle(x,y,Math.cos(a)*s,Math.sin(a)*s,rand(0.3,0.6),rand(2,5)*scale,color,'burst');
+  }
+  // Destruction debris: fewer, larger, jagged fragments with spin — a
+  // distinct "something broke apart" read layered on top of the round burst
+  // sparks above. High/Ultra tiers only (settings gate: destructionParticles)
+  // — it's the priciest-looking layer, so Low/Medium skip it by default.
+  if(Settings.destructionParticles){
+    const dn=Math.round(4*scale*(Settings.particleDensity||1));
+    for(let i=0;i<dn;i++){
+      const a=rand(0,Math.PI*2),s=rand(40,150)*scale;
+      spawnParticle(x,y,Math.cos(a)*s,Math.sin(a)*s,rand(0.45,0.85),rand(4,9)*scale,color,'debris');
+    }
   }
 }
 function ringFx(x,y,r,color,dur=0.45){
@@ -51,6 +64,7 @@ function epMotes(x,y,n){
   }catch(_){}
 }
 function callout(text,color,sys,who){
+  if(!Settings.calloutFeed)return; // settings gate: calloutFeed
   const feed=$('calloutFeed');
   if(!feed)return;
   const div=document.createElement('div');
@@ -79,25 +93,25 @@ function handleEvent(e){
     case'hit':
       if(e.shield){popup(e.x,e.y,'SHIELD','#7fd6ff',true,false);AudioSys.play('shield');}
       else if(e.amt>0){
-        popup(e.x,e.y,String(e.amt),e.crit?'#ffd166':'#ffffff',false,e.crit);
+        if(Settings.damageText)popup(e.x,e.y,String(e.amt),e.crit?'#ffd166':'#ffffff',false,e.crit); // settings gate: damageText
         AudioSys.play(e.crit?'crit':'hit');
       }
       break;
     case'die':
       deathBurst(e.x,e.y,e.color,e.scale||1);
-      popup(e.x,e.y-14,'+'+e.ep+' EP','#3ee8c8',true,false,true);
+      if(Settings.damageText)popup(e.x,e.y-14,'+'+e.ep+' EP','#3ee8c8',true,false,true); // settings gate: damageText
       AudioSys.play(e.boss?'bossdie':'kill');
       epMotes(e.x,e.y,e.boss?8:3);
       break;
     case'split':deathBurst(e.x,e.y,'#ffd6ee',0.7);AudioSys.play('split');break;
     case'leak':
-      popup(e.x,e.y,'-'+e.dmg+' HP','#ff4d6d',false,false,true);
-      FX.flashHurt=Math.max(FX.flashHurt,0.55);
+      if(Settings.damageText)popup(e.x,e.y,'-'+e.dmg+' HP','#ff4d6d',false,false,true); // settings gate: damageText
+      if(Settings.hitFlash)FX.flashHurt=Math.max(FX.flashHurt,0.55); // settings gate: hitFlash
       AudioSys.play('leak');shake(6);
       hintDone('leak');
       break;
     case'hurt':
-      if(e.pid===App.myPid&&performance.now()-lastHurtFlash>300){
+      if(Settings.hitFlash&&e.pid===App.myPid&&performance.now()-lastHurtFlash>300){ // settings gate: hitFlash
         FX.flashHurt=Math.max(FX.flashHurt,0.3);
         lastHurtFlash=performance.now();
       }
@@ -115,7 +129,7 @@ function handleEvent(e){
       break;
     case'heal':
       popup(e.x,e.y-30,'HEAL BURST','#8fe36a');
-      FX.flashHeal=0.6;
+      if(Settings.hitFlash)FX.flashHeal=0.6; // settings gate: hitFlash
       if(e.body>0)callout('Heal Burst: +'+e.body+' Body HP'+(e.players.length?' & '+e.players.join(', '):''),'#8fe36a',false);
       AudioSys.play('heal');
       break;

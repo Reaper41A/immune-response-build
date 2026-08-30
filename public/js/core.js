@@ -3,7 +3,7 @@
    ========================================================================== */
 'use strict';
 
-const GAME_VERSION='1.2.0'; // see js/changelog.js (drives in-game CHANGELOG tab)
+const GAME_VERSION='1.4.2'; // see js/changelog.js (drives in-game CHANGELOG tab)
 
 /* ---------------------------------------------------------------- utils */
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -80,7 +80,13 @@ let VW=1280,VH=720,vScale=1,vOffX=0,vOffY=0;
 function resize(){
   const wrap=$('gameWrap');
   const rect=wrap.getBoundingClientRect();
-  DPR=Math.min(window.devicePixelRatio||1,2);
+  // dprCap is the crispness lever (Settings tab): Low caps device pixels at
+  // 1 (a soft, slightly blurred upscale on any high-DPR screen — trading
+  // sharpness for fill-rate), Ultra allows up to 3 (native-sharp on modern
+  // high-DPR phones/monitors). Falls back to the old hardcoded cap of 2 if
+  // settings.js hasn't loaded yet for some reason.
+  const cap=(typeof Settings!=='undefined'&&Settings.dprCap)?Settings.dprCap:2;
+  DPR=Math.min(window.devicePixelRatio||1,cap);
   W=Math.max(1,Math.round(rect.width));H=Math.max(1,Math.round(rect.height));
   // Phone-class detection uses the SHORT side of the device, not the short
   // side of the current orientation — a phone rotated to landscape still
@@ -91,7 +97,9 @@ function resize(){
   // reads the same phone in portrait or landscape.
   const shortSide=Math.min(screen.width||W,screen.height||H);
   COMPACT=shortSide<560;
-  if(!resize.init){resize.init=true;RES=1;} // start at full resolution; PERF backs off only if frame time actually demands it
+  // start at the player's chosen resolution (Settings tab) — PERF only backs
+  // this off further live when the player has left it on Auto
+  if(!resize.init){resize.init=true;RES=(typeof Settings!=='undefined'?Settings.resScale:1);}
   canvas.width=Math.max(1,Math.round(W*DPR*RES));
   canvas.height=Math.max(1,Math.round(H*DPR*RES));
   canvas.style.width=W+'px';canvas.style.height=H+'px';

@@ -16,21 +16,119 @@
      date: "2026-08-29",     // ISO date
      title: "Short player-facing title",
      sections: {
-       added:   ["..."],   // new content/features
-       changed: ["..."],   // behavior/systems changes that aren't strictly a nerf/buff
-       nerfs:   ["..."],   // anything that makes a class/enemy/item weaker
-       buffs:   ["..."],   // anything that makes a class/enemy/item stronger
-       fixed:   ["..."],   // bug fixes
+       added:   ["..."],   // new content/features — plain strings
+       changed: ["..."],   // behavior/systems changes that aren't strictly a nerf/buff — plain strings
+       nerfs:   [NerfBuffEntry, ...],   // anything that makes a class/enemy/weapon weaker
+       buffs:   [NerfBuffEntry, ...],   // anything that makes a class/enemy/weapon stronger
+       fixed:   ["..."],   // bug fixes — plain strings
      }
    }
    Any section can be omitted or left as an empty array — the renderer
    (changelog.js UI code + ui.js wiring) skips empty sections automatically.
    Keep entries written for players, not for other devs: plain language,
-   short lines, no internal file/function names.
+   short lines, no internal file/function names (the one exception is the
+   `entity`/`weapon` keys below, which are internal keys used to look up
+   display names/icons — they are never shown to the player as raw text).
+   ----------------------------------------------------------------------------
+   NerfBuffEntry shape (structured stat-comparison format, added in 1.4.2):
+   {
+     entityType: 'class' | 'enemy',     // which table `entity` is looked up in
+     entity: 'tcell',                   // key into CLASSES or ENEMY_DEFS
+     weapon: 'enzymeBeam',              // OPTIONAL — key into WEAPONS, only when
+                                         // a weapon stat changed. Triggers an
+                                         // auto-computed before/after DPS line.
+     changes: [
+       { stat:'hp', label:'HP', before:120, after:90 },
+       { stat:'dmg', label:'Damage', before:14, after:50 },
+       // `stat` is free-form (hp, speed, range, dmg, rate, pierce, spread,
+       // critChance, cooldown, duration, etc.) — only 'dmg' and 'rate' on a
+       // change with a `weapon` key trigger the DPS calc. `label` is the
+       // player-facing stat name. `before`/`after` must be numbers actually
+       // stated in the source patch notes — never invent or estimate one.
+     ],
+     note: 'optional short flavor/context sentence, plain language'
+   }
+   DPS for a `weapon` change is computed live by computeWeaponDps() from the
+   actual WEAPONS entry (see combat.js for the real fire-resolution logic —
+   pellet count, crit multiplier, pierce, etc. — before assuming a plain
+   dmg/rate formula is correct for a given weapon). Do not hand-compute and
+   hardcode a DPS number into the data; supply before/after stat values and
+   let the renderer derive it, so the figure can never drift out of sync
+   with the live WEAPONS table.
    ========================================================================== */
 'use strict';
 
 const CHANGELOG=[
+  {
+    version:'1.4.2',
+    date:'2026-08-30',
+    title:'Structured Nerfs & Buffs',
+    sections:{
+      added:[
+        'The Nerfs & Buffs tab now shows real stat comparisons instead of plain sentences: each entry names the class/enemy/weapon involved and lists the exact stat(s) that changed, before → after.',
+        'Where damage or fire rate changed, the tab now also shows a computed single-target DPS comparison (before vs after), worked out from each weapon\u2019s actual fire pattern \u2014 pellet count, crit chance, and so on \u2014 not just a flat damage-over-cooldown guess.'
+      ],
+      changed:[
+        'Retrofitted every existing nerf/buff entry (v1.1.0 and v1.2.0) into the new structured format so the whole history is consistent.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[]
+    }
+  },
+  {
+    version:'1.4.1',
+    date:'2026-08-30',
+    title:'Nerfs & Buffs, Grouped by Version',
+    sections:{
+      added:[],
+      changed:[
+        'The Nerfs & Buffs tab now groups every change by the version it shipped in, newest first, instead of dumping every nerf ever made into one list and every buff into another — it was easy to lose track of which patch did what.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[]
+    }
+  },
+  {
+    version:'1.4.0',
+    date:'2026-08-30',
+    title:'Fixed Controls & Aim Tracer',
+    sections:{
+      added:[
+        'New touch control scheme option (Settings \u2192 Controls): "Fixed" gives both sticks a permanent base position instead of appearing wherever you first touch, and locks the ability button directly above the aim stick with a guaranteed gap — it can no longer end up covered by the fire/aim stick. Works in both portrait and landscape. "Floating" (the original behavior) is still there and stays the default.',
+        'Aim tracer: an optional guide line from your cell out to your weapon\u2019s exact range, along wherever you\u2019re currently aiming.',
+        'Five tracer styles to choose from — Laser, Solid, Dotted, Segmented, and Pulse — each with its own look, selectable in Settings \u2192 Controls.'
+      ],
+      changed:[],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'On touch devices, the ability button could end up directly underneath the aim stick depending on where a drag started, making it hard or impossible to tap. Switching to the new Fixed control scheme resolves this — the ability button\u2019s position no longer depends on where you touch.'
+      ]
+    }
+  },
+  {
+    version:'1.3.0',
+    date:'2026-08-30',
+    title:'Aim Assist & Settings',
+    sections:{
+      added:[
+        'New Settings screen, reachable from the main menu and the pause menu — tune graphics and controls without leaving a run.',
+        'Aim assist: while manually aiming, your shot gently bends toward a nearby enemy in front of your cursor/stick instead of demanding a pixel-perfect line. It never fires or picks targets on its own, and can be tuned or switched off entirely. In multiplayer, this is each player\u2019s own choice — a squadmate turning it off (or up) doesn\u2019t affect anyone else.',
+        'Four graphics presets — Low, Medium, High, Ultra — each a genuinely different look, not just a label: Low softens and shrinks the image to save GPU time, Ultra draws at full native sharpness with a boosted particle budget and a 120fps cap for high-refresh screens.',
+        'A "Recommended for this device" suggestion on the Settings screen, estimated from your device\u2019s CPU, memory, and screen.',
+        'Every setting inside a preset can be overridden individually — render scale, sharpness, frame rate cap, particle density, glow/bloom quality, projectile trail length, destruction debris, screen shake, damage/heal screen flash, background ambience, capillary veins, damage text, callout feed, and the range ring.',
+        'Destruction debris: jagged spinning fragments now fly out of a kill alongside the usual spark burst, for a more satisfying "that thing broke apart" read on High and Ultra.'
+      ],
+      changed:[
+        'The How to Play screen and the FIRE tutorial hint now describe manual aiming (mouse/aim-stick) instead of the old auto-lock wording, matching how aiming has actually worked for a while.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[]
+    }
+  },
   {
     version:'1.2',
     date:'2026-08-29',
@@ -65,28 +163,80 @@ const CHANGELOG=[
       ],
       nerfs:[
         'Damage, fire rate, economy, and move-speed upgrades now cap at 4\u20136 stacks with diminishing returns per stack, instead of scaling forever \u2014 this was the main fix for squads outgrowing what enemies could keep up with on long runs.',
-        'Macrophage move speed 118\u219290.',
-        'Phagocytosis Shotgun damage per pellet 8\u21926, and fire rate slowed 0.55s\u21920.60s between shots.',
-        'Taunt cooldown 14s\u219215s.',
-        'T-Cell HP 120\u219290.',
-        'T-Cell move speed 150\u219270 \u2014 now the slowest class in the game.',
-        'Enzyme Beam reworked from a rapid-fire weapon (14 dmg every 0.18s) into a slow, hard-hitting burst weapon (50 dmg every 1.0s).',
-        'Overdrive cooldown 16s\u219220s.',
-        'B-Cell range 300\u2192260.',
-        'Antibody Blaster fire rate slowed 0.14s\u21920.20s between shots.',
-        'Natural Killer range 380\u2192290 \u2014 the largest range cut of any class this patch.',
-        'Dual SMG damage 6\u21924.',
-        'Dash cooldown 8s\u219210s.'
+        {entityType:'class',entity:'macrophage',
+          changes:[{stat:'speed',label:'Move Speed',before:118,after:90}]},
+        {entityType:'class',entity:'macrophage',weapon:'phagoShotgun',
+          changes:[
+            {stat:'dmg',label:'Damage per Pellet',before:8,after:6},
+            {stat:'rate',label:'Fire Rate',before:0.55,after:0.60,unit:'s between shots',lowerIsBetter:true}
+          ]},
+        {entityType:'class',entity:'macrophage',
+          changes:[{stat:'cooldown',label:'Taunt Cooldown',before:14,after:15,unit:'s',lowerIsBetter:true}]},
+        {entityType:'class',entity:'tcell',
+          changes:[{stat:'hp',label:'HP',before:120,after:90}]},
+        {entityType:'class',entity:'tcell',
+          changes:[{stat:'speed',label:'Move Speed',before:150,after:70}],
+          note:'Now the slowest class in the game.'},
+        {entityType:'class',entity:'tcell',weapon:'enzymeBeam',
+          changes:[
+            {stat:'dmg',label:'Damage',before:14,after:50},
+            {stat:'rate',label:'Fire Rate',before:0.18,after:1.0,unit:'s between shots',lowerIsBetter:true}
+          ],
+          note:'Reworked from a rapid-fire weapon into a slow, hard-hitting burst weapon.'},
+        {entityType:'class',entity:'tcell',
+          changes:[{stat:'cooldown',label:'Overdrive Cooldown',before:16,after:20,unit:'s',lowerIsBetter:true}]},
+        {entityType:'class',entity:'bcell',
+          changes:[{stat:'range',label:'Range',before:300,after:260}]},
+        {entityType:'class',entity:'bcell',weapon:'antibodyBlaster',
+          changes:[{stat:'rate',label:'Fire Rate',before:0.14,after:0.20,unit:'s between shots',lowerIsBetter:true}]},
+        {entityType:'class',entity:'nk',
+          changes:[{stat:'range',label:'Range',before:380,after:290}],
+          note:'The largest range cut of any class this patch.'},
+        // Dual SMG's damage nerf and crit-chance buff shipped in the same
+        // patch and both affect DPS — kept as ONE entry with both stats so
+        // the before/after DPS reflects the real net change (6dmg/22%crit
+        // -> 4dmg/32%crit), instead of two entries that would each hold the
+        // other stat at its post-patch value and show a misleading "before".
+        // Filed under nerfs since the headline change here is the damage cut;
+        // the crit-chance side of this same entry is mirrored under buffs.
+        {entityType:'class',entity:'nk',weapon:'dualSmg',
+          changes:[
+            {stat:'dmg',label:'Damage',before:6,after:4},
+            {stat:'critChance',label:'Crit Chance',before:0.22,after:0.32,pct:true}
+          ],
+          note:'Crit chance was buffed in the same patch (see Buffs) \u2014 DPS below reflects both changes together.'},
+        {entityType:'class',entity:'nk',
+          changes:[{stat:'cooldown',label:'Dash Cooldown',before:8,after:10,unit:'s',lowerIsBetter:true}]}
       ],
       buffs:[
-        'Macrophage HP 180\u2192250.',
-        'Phagocytosis Shotgun spread tightened, making its pellets group up more.',
-        'Taunt duration 2.5s\u21923s.',
-        'T-Cell range 320\u2192350.',
-        'Heal Burst now heals allies for 80 (up from 60) and restores 60 HP to the caster (up from 40).',
-        'Heal Burst cooldown 20s\u219210s \u2014 roughly triples B-Cell\u2019s sustained healing output.',
-        'Dual SMG crit chance 22%\u219232%.',
-        'Piercing Strike (Dash-through damage perk) multiplier \u00d72\u2192\u00d72.6.'
+        {entityType:'class',entity:'macrophage',
+          changes:[{stat:'hp',label:'HP',before:180,after:250}]},
+        {entityType:'class',entity:'macrophage',weapon:'phagoShotgun',
+          changes:[],
+          note:'Pellet spread tightened, making its pellets group up more.'},
+        {entityType:'class',entity:'macrophage',
+          changes:[{stat:'duration',label:'Taunt Duration',before:2.5,after:3,unit:'s'}]},
+        {entityType:'class',entity:'tcell',
+          changes:[{stat:'range',label:'Range',before:320,after:350}]},
+        {entityType:'class',entity:'bcell',
+          changes:[
+            {stat:'healAllies',label:'Heal Burst \u2014 Ally Heal',before:60,after:80},
+            {stat:'healSelf',label:'Heal Burst \u2014 Caster Heal',before:40,after:60}
+          ]},
+        {entityType:'class',entity:'bcell',
+          changes:[{stat:'cooldown',label:'Heal Burst Cooldown',before:20,after:10,unit:'s',lowerIsBetter:true}],
+          note:'Roughly triples B-Cell\u2019s sustained healing output.'},
+        // Same combined entry as under Nerfs — see note there. Shown here
+        // too since the crit-chance change on its own is a buff, but the
+        // DPS figure is only meaningful as the net of both stats together.
+        {entityType:'class',entity:'nk',weapon:'dualSmg',
+          changes:[
+            {stat:'dmg',label:'Damage',before:6,after:4},
+            {stat:'critChance',label:'Crit Chance',before:0.22,after:0.32,pct:true}
+          ],
+          note:'Damage was nerfed in the same patch (see Nerfs) \u2014 DPS below reflects both changes together.'},
+        {entityType:'class',entity:'nk',
+          changes:[{stat:'mult',label:'Piercing Strike Multiplier (Dash-through damage perk)',before:2,after:2.6,unit:'\u00d7'}]}
       ],
       fixed:[]
     }
@@ -241,7 +391,9 @@ const CHANGELOG=[
         'Squad-upgrade prices now scale up with the wave instead of staying at their wave-1 price forever.'
       ],
       nerfs:[
-        'Virus enemy speed reduced (118 \u2192 104) to keep it dangerous without being unfairly hard to track at the new pace of play.'
+        {entityType:'enemy',entity:'virus',
+          changes:[{stat:'speed',label:'Speed',before:118,after:104}],
+          note:'Keeps it dangerous without being unfairly hard to track at the new pace of play.'}
       ],
       buffs:[],
       fixed:[
@@ -395,7 +547,173 @@ function setChangelogTab(active){
 
 function renderChangelogSectionList(items){
   if(!items||!items.length)return '';
-  return `<ul>${items.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+  // added/changed/fixed are always plain strings. nerfs/buffs can contain
+  // either plain strings (rare, legacy-style one-off notes) or structured
+  // NerfBuffEntry objects — route each accordingly.
+  return `<ul>${items.map(t=>
+    typeof t==='string'?`<li>${escapeHtml(t)}</li>`:`<li>${renderNerfBuffEntryInline(t)}</li>`
+  ).join('')}</ul>`;
+}
+
+/* ----------------------------------------------------------------------
+   Structured nerf/buff stat comparison
+   ----------------------------------------------------------------------
+   Looks up the entity's display name/icon from CLASSES or ENEMY_DEFS (data.js)
+   and, when a `weapon` key is present alongside a dmg/rate stat change,
+   derives an actual before/after DPS figure from the live WEAPONS table
+   rather than trusting a hardcoded number — see computeWeaponDps() for the
+   per-weapon fire-pattern handling (pellets, crit, etc.), sourced from the
+   real resolution logic in combat.js/enemies.js. */
+
+function nerfBuffEntityInfo(entry){
+  const isEnemy=entry.entityType==='enemy';
+  const table=isEnemy?ENEMY_DEFS:CLASSES;
+  const def=table&&table[entry.entity];
+  // ENEMY_DEFS entries have no `icon` field (only CLASSES does) — enemies
+  // fall back to a generic pathogen icon rather than showing "undefined".
+  return{
+    name:def?def.name:entry.entity,
+    icon:def&&def.icon?def.icon:(isEnemy?'🦠':'❓'),
+  };
+}
+
+// Average per-shot multiplier from crit chance, matching the 1.8x crit
+// multiplier applied in enemies.js's projectile-hit resolution.
+const CRIT_MULT=1.8;
+
+/* Computes sustained single-target DPS for a weapon given an optional stat
+   override (e.g. {dmg:50} or {rate:1.0}), reading every other stat from the
+   live WEAPONS table. Mirrors the actual fire-resolution path:
+   - proj: multiple pellets (e.g. Phagocytosis Shotgun) all count toward
+     single-target DPS since nothing in combat.js reduces per-pellet damage
+     when several pellets connect with the same enemy at close range.
+   - critChance: averaged in as (1 + critChance*(CRIT_MULT-1)) per shot,
+     matching the 1.8x multiplier rolled per-projectile in enemies.js.
+   - pierce/spread/knockback/splash don't change single-target sustained
+     DPS against one enemy standing in the shot's path, so they're not
+     factored in here.
+   rate is time BETWEEN shots (seconds), so DPS = dmg*proj*critFactor/rate. */
+function computeWeaponDps(weaponKey,overrides){
+  const w=WEAPONS[weaponKey];
+  if(!w)return null;
+  const dmg=(overrides&&overrides.dmg!=null)?overrides.dmg:w.dmg;
+  const rate=(overrides&&overrides.rate!=null)?overrides.rate:w.rate;
+  const critChance=(overrides&&overrides.critChance!=null)?overrides.critChance:(w.critChance||0);
+  const proj=w.proj||1;
+  if(!rate)return null;
+  const critFactor=1+critChance*(CRIT_MULT-1);
+  return dmg*proj*critFactor/rate;
+}
+
+// For a NerfBuffEntry with a `weapon` key, find whichever dmg/rate/critChance
+// changes are present and compute before/after DPS holding everything else
+// at the CURRENT (post-patch) live WEAPONS value except the stat(s) that
+// this specific entry states — so a patch that only touches dmg still shows
+// an accurate DPS delta without needing rate re-stated redundantly.
+function nerfBuffEntryDps(entry){
+  if(!entry.weapon||!WEAPONS[entry.weapon])return null;
+  const relevant={dmg:null,rate:null,critChance:null};
+  let any=false;
+  for(const c of entry.changes||[]){
+    if(c.stat==='dmg'||c.stat==='rate'||c.stat==='critChance'){relevant[c.stat]=c;any=true;}
+  }
+  if(!any)return null;
+  const beforeOverrides={},afterOverrides={};
+  for(const k of Object.keys(relevant)){
+    const c=relevant[k];
+    if(c){beforeOverrides[k]=c.before;afterOverrides[k]=c.after;}
+  }
+  const before=computeWeaponDps(entry.weapon,beforeOverrides);
+  const after=computeWeaponDps(entry.weapon,afterOverrides);
+  if(before==null||after==null)return null;
+  return{before,after};
+}
+
+function fmtStatNum(n){
+  if(typeof n!=='number')return String(n);
+  return Number.isInteger(n)?String(n):String(Math.round(n*100)/100);
+}
+
+function fmtStatValue(c){
+  if(c.pct){
+    return{before:Math.round(c.before*100)+'%',after:Math.round(c.after*100)+'%'};
+  }
+  const unit=c.unit?(c.unit.startsWith('s')||c.unit==='%'?c.unit:' '+c.unit):'';
+  return{before:fmtStatNum(c.before)+(c.unit?(c.unit.match(/^[a-zA-Z]/)?' '+c.unit:c.unit):''),
+         after:fmtStatNum(c.after)+(c.unit?(c.unit.match(/^[a-zA-Z]/)?' '+c.unit:c.unit):'')};
+}
+
+// direction: true if before->after is an improvement for the player-facing
+// stat (used only for a small ▲/▼ visual cue, purely cosmetic).
+function statDirectionUp(c){
+  const better=c.after>c.before;
+  return c.lowerIsBetter?!better:better;
+}
+
+function renderStatChangeRow(c){
+  const {before,after}=fmtStatValue(c);
+  const up=statDirectionUp(c);
+  const arrow=up?'▲':(after===before?'•':'▼');
+  return `<div class="nb-stat-row">
+    <span class="nb-stat-label">${escapeHtml(c.label||c.stat)}</span>
+    <span class="nb-stat-vals"><span class="nb-stat-before">${escapeHtml(before)}</span> → <span class="nb-stat-after">${escapeHtml(after)}</span></span>
+    <span class="nb-stat-dir ${up?'up':'down'}">${arrow}</span>
+  </div>`;
+}
+
+function renderDpsRow(dps){
+  const delta=dps.after-dps.before;
+  const pct=dps.before?Math.round((delta/dps.before)*1000)/10:0;
+  const sign=delta>0?'+':'';
+  const cls=delta>0?'up':(delta<0?'down':'flat');
+  return `<div class="nb-dps-row ${cls}">
+    <span class="nb-dps-label">Single-target DPS</span>
+    <span class="nb-dps-vals">${fmtStatNum(dps.before)} → ${fmtStatNum(dps.after)}</span>
+    <span class="nb-dps-delta">(${sign}${fmtStatNum(delta)}, ${sign}${pct}%)</span>
+  </div>`;
+}
+
+// Full card rendering used in the Nerfs & Buffs tab.
+function renderNerfBuffEntryCard(entry,cls){
+  if(typeof entry==='string'){
+    return `<div class="nb-item ${cls}">
+      <span class="nb-tag">${cls}</span>
+      <span class="nb-body">${escapeHtml(entry)}</span>
+    </div>`;
+  }
+  const info=nerfBuffEntityInfo(entry);
+  const weaponName=entry.weapon&&WEAPONS[entry.weapon]?WEAPONS[entry.weapon].name:null;
+  const statRows=(entry.changes||[]).map(renderStatChangeRow).join('');
+  const dps=nerfBuffEntryDps(entry);
+  return `<div class="nb-item nb-item-structured ${cls}">
+    <span class="nb-tag">${cls}</span>
+    <div class="nb-body">
+      <div class="nb-entity-head">
+        <span class="nb-entity-icon">${escapeHtml(info.icon)}</span>
+        <span class="nb-entity-name">${escapeHtml(info.name)}</span>
+        ${weaponName?`<span class="nb-weapon-name">${escapeHtml(weaponName)}</span>`:''}
+      </div>
+      ${statRows?`<div class="nb-stat-list">${statRows}</div>`:''}
+      ${dps?renderDpsRow(dps):''}
+      ${entry.note?`<div class="nb-note">${escapeHtml(entry.note)}</div>`:''}
+    </div>
+  </div>`;
+}
+
+// Compact inline rendering used inside a single version's detail page
+// (Nerfs/Buffs sections use the same bullet-list style as Added/Changed/
+// Fixed there, so structured entries render as a single readable line).
+function renderNerfBuffEntryInline(entry){
+  const info=nerfBuffEntityInfo(entry);
+  const weaponName=entry.weapon&&WEAPONS[entry.weapon]?WEAPONS[entry.weapon].name:null;
+  const statBits=(entry.changes||[]).map(c=>{
+    const {before,after}=fmtStatValue(c);
+    return `${escapeHtml(c.label||c.stat)} ${escapeHtml(before)}→${escapeHtml(after)}`;
+  }).join(', ');
+  const dps=nerfBuffEntryDps(entry);
+  const dpsBit=dps?` (DPS ${fmtStatNum(dps.before)}→${fmtStatNum(dps.after)})`:'';
+  const head=`<b>${escapeHtml(info.name)}${weaponName?' — '+escapeHtml(weaponName):''}</b>`;
+  return `${head}${statBits?': '+statBits:''}${dpsBit}${entry.note?(statBits?' — ':': ')+escapeHtml(entry.note):''}`;
 }
 
 function showChangelogVersionList(){
@@ -449,31 +767,33 @@ function showChangelogDetail(idx){
   $('btnChangelogDetailBack').addEventListener('click',()=>{AudioSys.play('ui');showChangelogVersionList();});
 }
 
-// Aggregates every nerf/buff across all versions, newest first, into one
-// scrollable history — so players can trace how a class/enemy/stat has
-// been tuned over time without hunting through individual version entries.
+// Groups nerfs and buffs by version, newest first — each version gets its
+// own header with both its nerfs and buffs underneath, instead of the old
+// layout that pooled every nerf from every version into one list and every
+// buff from every version into a second list (so a v1.0 change and a v1.3
+// change sat side by side with nothing showing which version did what).
 function showChangelogNerfsBuffs(){
   setChangelogTab('nerfsbuffs');
   const body=$('changelogScreenBody');
   if(!body)return;
-  const nerfItems=[],buffItems=[];
-  for(const entry of CHANGELOG){
-    for(const t of (entry.sections.nerfs||[]))nerfItems.push({text:t,version:entry.version});
-    for(const t of (entry.sections.buffs||[]))buffItems.push({text:t,version:entry.version});
-  }
-  if(!nerfItems.length&&!buffItems.length){
+  const versionsWithChanges=CHANGELOG.filter(entry=>
+    (entry.sections.nerfs||[]).length||(entry.sections.buffs||[]).length
+  );
+  if(!versionsWithChanges.length){
     body.innerHTML='<div class="changelog-empty">No balance changes logged yet — nerfs and buffs will show up here as soon as they happen.</div>';
     return;
   }
-  const group=(label,items,cls)=>{
-    if(!items.length)return '';
-    return `<div class="nb-group">
-      <div class="nb-group-head">${label} (${items.length})</div>
-      ${items.map(it=>`<div class="nb-item ${cls}">
-        <span class="nb-tag">${cls}</span>
-        <span class="nb-body">${escapeHtml(it.text)}<span class="nb-ver">v${escapeHtml(it.version)}</span></span>
-      </div>`).join('')}
+  const itemsHtml=(items,cls)=>items.map(t=>renderNerfBuffEntryCard(t,cls)).join('');
+  body.innerHTML=`<div class="nb-version-list">${versionsWithChanges.map(entry=>{
+    const nerfs=entry.sections.nerfs||[],buffs=entry.sections.buffs||[];
+    return `<div class="nb-version-group">
+      <div class="nb-version-head">
+        <span class="nb-version-num">v${escapeHtml(entry.version)}</span>
+        ${entry.title?`<span class="nb-version-title">${escapeHtml(entry.title)}</span>`:''}
+        <span class="nb-version-date">${escapeHtml(entry.date||'')}</span>
+      </div>
+      ${nerfs.length?`<div class="nb-subgroup-head nerf">NERFS (${nerfs.length})</div>${itemsHtml(nerfs,'nerf')}`:''}
+      ${buffs.length?`<div class="nb-subgroup-head buff">BUFFS (${buffs.length})</div>${itemsHtml(buffs,'buff')}`:''}
     </div>`;
-  };
-  body.innerHTML=group('NERFS',nerfItems,'nerf')+group('BUFFS',buffItems,'buff');
+  }).join('')}</div>`;
 }

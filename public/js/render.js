@@ -26,7 +26,14 @@ function glowSprite(color,r){
   return s;
 }
 function blitGlow(spr,x,y,alpha){
-  ctx.globalAlpha=alpha;
+  // glowQuality settings gate: 'off' skips bloom entirely (cheapest, used by
+  // Low), 'reduced' keeps the cue but dimmer/smaller (Medium), 'full' is
+  // unchanged (High/Ultra) — every caller passes through this one spot so
+  // there's a single place that decides how much bloom the game spends.
+  const q=Settings.glowQuality;
+  if(q==='off')return;
+  const mul=q==='reduced'?0.55:1;
+  ctx.globalAlpha=alpha*mul;
   ctx.drawImage(spr,x-spr.width/2,y-spr.height/2);
   ctx.globalAlpha=1;
 }
@@ -59,24 +66,26 @@ function drawBackground(hbBeat){
   // each frame so they can pulse with the Body's heartbeat (hbBeat, same
   // signal that scales the core in drawCore) — the whole arena reads as
   // living tissue instead of a painted backdrop.
-  drawVeins(hbBeat||0);
+  if(Settings.veins)drawVeins(hbBeat||0); // settings gate: veins
 
-  if(!ambientSeeds){
-    ambientSeeds=[];
-    for(let i=0;i<9;i++)ambientSeeds.push({sx:rand(0,1000),sy:rand(0,1000),r:rand(26,64),hue:i%2});
-  }
-  if(!REDUCED&&!COMPACT){ // ambient drift skipped on phones — pure fill-rate cost
-    const t=performance.now()/1000;
-    ctx.globalAlpha=0.045;
-    for(const s of ambientSeeds){
-      const x=((Math.sin(t*0.05+s.sx)*0.5+0.5)*VW*1.2)-VW*0.1;
-      const y=((Math.cos(t*0.04+s.sy)*0.5+0.5)*VH*1.2)-VH*0.1;
-      ctx.fillStyle=s.hue?'#3ee8c8':'#7fd6ff';
-      ctx.beginPath();ctx.arc(x,y,s.r,0,Math.PI*2);ctx.fill();
+  if(Settings.backgroundFx){ // settings gate: backgroundFx
+    if(!ambientSeeds){
+      ambientSeeds=[];
+      for(let i=0;i<9;i++)ambientSeeds.push({sx:rand(0,1000),sy:rand(0,1000),r:rand(26,64),hue:i%2});
     }
-    ctx.globalAlpha=1;
+    if(!REDUCED&&!COMPACT){ // ambient drift skipped on phones — pure fill-rate cost
+      const t=performance.now()/1000;
+      ctx.globalAlpha=0.045;
+      for(const s of ambientSeeds){
+        const x=((Math.sin(t*0.05+s.sx)*0.5+0.5)*VW*1.2)-VW*0.1;
+        const y=((Math.cos(t*0.04+s.sy)*0.5+0.5)*VH*1.2)-VH*0.1;
+        ctx.fillStyle=s.hue?'#3ee8c8':'#7fd6ff';
+        ctx.beginPath();ctx.arc(x,y,s.r,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+    drawFloatingCells();
   }
-  drawFloatingCells();
 }
 
 /* Capillary network radiating from the Body core. Redrawn live (not baked)
@@ -179,7 +188,7 @@ function drawFloatingCells(){
    atmospheric: no collision, no gameplay effect. Called late in the render
    order so it sits above entities, same visual idea as a cloud shadow. */
 function drawDriftingOrganisms(dt){
-  if(REDUCED)return;
+  if(REDUCED||!Settings.backgroundFx)return; // settings gate: backgroundFx
   if(!driftOrganisms)driftOrganisms=[];
   // spawn a new one occasionally
   if(!COMPACT&&Math.random()<dt*0.045&&driftOrganisms.length<2){
@@ -355,12 +364,20 @@ function drawPickups(view){
 }
 function drawProjectiles(view){
   ctx.lineCap='round';
+  // trailLength settings gate: 'short' shows fewer of the trail points the
+  // sim already tracks (cheaper to stroke, snappier look), 'long' shows all
+  // of them (the full motion-streak). This is display-only — the sim's own
+  // trail history (enemies.js stepProjectiles) is unchanged either way, so
+  // it stays deterministic/host-authoritative regardless of a viewer's
+  // local settings.
+  const trailN=Settings.trailLength==='short'?2:5;
   for(const pr of view.projs||[]){
     ctx.strokeStyle=hexToRgba(pr.c,0.5);
     ctx.lineWidth=pr.sp?4:3;
     ctx.beginPath();
-    for(let i=0;i<(pr.tr||[]).length;i++){
-      const pt=pr.tr[i];
+    const tr=(pr.tr||[]).slice(-trailN);
+    for(let i=0;i<tr.length;i++){
+      const pt=tr[i];
       i===0?ctx.moveTo(pt[0],pt[1]):ctx.lineTo(pt[0],pt[1]);
     }
     ctx.lineTo(pr.x,pr.y);ctx.stroke();
@@ -382,6 +399,71 @@ function drawFakeTraces(){
     ctx.restore();
   }
 }
+/* ------------------------------------------------------------- aim tracer
+   A guide line from the player's cell out to weapon range along the current
+   aim direction (settings gate: tracer). ux,uy is a unit vector — caller
+   normalizes. Five selectable styles (Settings → Controls → Tracer Style):
+   solid/dotted/segmented are cheap canvas strokes, laser reuses the glow-
+   sprite machinery for a bright bloomed core, pulse sends small traveling
+   blips outward (same visual language as the game's existing EP motes) for
+   a more "alive" read. All five stop exactly at `range`, never implying
+   reach the weapon doesn't have. */
+function drawAimTracer(px,py,ux,uy,range,t){
+  const ex=px+ux*range,ey=py+uy*range;
+  const style=Settings.tracerStyle;
+  ctx.save();
+  if(style==='dotted'){
+    const gap=14,n=Math.floor(range/gap);
+    ctx.fillStyle='rgba(62,232,200,0.55)';
+    for(let i=1;i<n;i++){
+      const d=i*gap;
+      ctx.beginPath();ctx.arc(px+ux*d,py+uy*d,1.8,0,Math.PI*2);ctx.fill();
+    }
+  }else if(style==='segmented'){
+    ctx.strokeStyle='rgba(62,232,200,0.5)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([16,10]);
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.setLineDash([]);
+  }else if(style==='laser'){
+    const flicker=0.75+Math.sin(t*22)*0.08; // subtle live-wire shimmer, not a strobe
+    ctx.strokeStyle=`rgba(62,232,200,${0.55*flicker})`;
+    ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex,ey);ctx.stroke();
+    const spr=glowSprite('#3ee8c8',10);
+    // a few glow blits spaced along the line reads as a bloomed beam without
+    // the cost of a gradient-filled thick stroke every frame
+    const steps=5;
+    for(let i=1;i<=steps;i++){
+      const f=i/steps;
+      blitGlow(spr,px+ux*range*f,py+uy*range*f,0.18*flicker);
+    }
+  }else if(style==='pulse'){
+    ctx.strokeStyle='rgba(62,232,200,0.18)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex,ey);ctx.stroke();
+    // 3 blips traveling outward on a shared loop, evenly spaced in phase —
+    // same "energy moving along a line" read as the game's EP motes, just
+    // constrained to the aim line instead of drifting toward the core.
+    const speed=340,period=range/speed;
+    for(let i=0;i<3;i++){
+      const phase=((t/period)+i/3)%1;
+      const d=phase*range;
+      const a=Math.sin(phase*Math.PI); // fade in/out at both ends, brightest mid-travel
+      ctx.fillStyle=`rgba(62,232,200,${0.7*a})`;
+      ctx.beginPath();ctx.arc(px+ux*d,py+uy*d,2.4,0,Math.PI*2);ctx.fill();
+    }
+  }else{ // 'solid' (default fallback)
+    const grad=ctx.createLinearGradient(px,py,ex,ey);
+    grad.addColorStop(0,'rgba(62,232,200,0.5)');
+    grad.addColorStop(1,'rgba(62,232,200,0.08)');
+    ctx.strokeStyle=grad;
+    ctx.lineWidth=1.8;
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex,ey);ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawParticles(){
   for(const pt of FX.parts){
     const a=clamp(pt.life/pt.maxLife,0,1);
@@ -393,6 +475,27 @@ function drawParticles(){
       ctx.fillStyle=pt.color;
       ctx.font='11px sans-serif';ctx.textAlign='center';
       ctx.fillText('✚',pt.x,pt.y);
+    }else if(pt.type==='debris'){
+      // Jagged irregular fragment (destruction particles, settings gate:
+      // destructionParticles) — an angular polygon that spins as it flies,
+      // reads distinctly from the round burst sparks alongside it.
+      if(!pt.rot)pt.rot=rand(0,Math.PI*2);
+      if(!pt.spin)pt.spin=rand(-9,9);
+      pt.rot+=pt.spin*0.016;
+      ctx.save();
+      ctx.translate(pt.x,pt.y);
+      ctx.rotate(pt.rot);
+      ctx.fillStyle=pt.color;
+      const r=pt.size;
+      ctx.beginPath();
+      ctx.moveTo(r,0);
+      ctx.lineTo(r*0.2,r*0.85);
+      ctx.lineTo(-r*0.9,r*0.3);
+      ctx.lineTo(-r*0.5,-r*0.8);
+      ctx.lineTo(r*0.3,-r*0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }else{
       ctx.fillStyle=pt.color;
       ctx.beginPath();ctx.arc(pt.x,pt.y,pt.size*(pt.type==='muzzle'?a:1),0,Math.PI*2);ctx.fill();

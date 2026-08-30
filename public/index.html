@@ -45,6 +45,17 @@
   --fire-btn-size:16vmin; --fire-btn-min:72px; --fire-btn-max:96px;
   --ability-btn-size:13vmin; --ability-btn-min:60px; --ability-btn-max:78px;
   --btn-gap:22px;
+
+  /* Fixed control scheme (Settings → Controls → Fixed): both sticks get a
+     permanent, always-visible base instead of appearing wherever you first
+     touch, and the ability button sits locked above the aim stick with
+     guaranteed clearance — this is the whole point of the scheme, so these
+     tokens define exactly how much room that clearance gets. */
+  --stick-base-r:56px;      /* radius of the fixed base ring */
+  --stick-travel:46px;      /* max thumb travel from base center — matches old AIM_MAX/joy max */
+  --fixed-ability-size:56px;
+  --fixed-stick-gutter:18px; /* base's distance from the screen edge */
+  --fixed-stick-bottom:calc(9vh + env(safe-area-inset-bottom));
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 .hidden{display:none !important;}
@@ -609,6 +620,77 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   .fire-btn,.ability-btn,.fire-key-hint,.ability-key-hint{display:none;}
 }
 
+/* ------------------------------------------------------- FIXED control scheme
+   Settings → Controls → "Fixed". Applied via a `fixed-scheme` class on
+   #gameWrap (toggled in main.js off Settings.controlScheme). Both sticks'
+   bases are pinned to a permanent spot near each bottom corner instead of
+   spawning at first-touch, and the ability button locks directly above the
+   aim stick's base with a fixed, generous gap — this is the actual fix for
+   "the fire stick appeared right on top of the ability button": in this
+   scheme the ability button's position is a constant, not a function of
+   where a drag happened to start.
+   The underlying touchmove/aim math in input.js is unchanged — only the
+   base's resting position is now fixed instead of set from the touchstart
+   coordinates, so the dead zone/ramp/outer-ring-skill-trigger logic all
+   still applies exactly as it does in Floating mode. */
+#gameWrap.fixed-scheme #joyBase,
+#gameWrap.fixed-scheme #aimBase{
+  display:block; /* always visible in Fixed mode, not just while touched */
+  opacity:.85;
+}
+#gameWrap.fixed-scheme #joyBase{
+  left:calc(var(--fixed-stick-gutter) + var(--stick-base-r)) !important;
+  bottom:var(--fixed-stick-bottom) !important;
+  top:auto !important;
+  transform:translate(-50%,50%);
+  width:calc(var(--stick-base-r) * 2);height:calc(var(--stick-base-r) * 2);
+}
+#gameWrap.fixed-scheme #aimBase{
+  right:calc(var(--fixed-stick-gutter) + var(--stick-base-r)) !important;
+  left:auto !important;
+  bottom:var(--fixed-stick-bottom) !important;
+  top:auto !important;
+  transform:translate(50%,50%);
+  width:calc(var(--stick-base-r) * 2);height:calc(var(--stick-base-r) * 2);
+}
+/* Fixed mode drops the outer skill-trigger ring visually (the aim stick's
+   travel is now a short, fixed-position hop rather than an open-ended drag,
+   so a second concentric ring around it reads as clutter/confusion right
+   next to the ability button) — the skill still fires the same way, off the
+   ability button itself, which is the whole reason Fixed mode exists. */
+#gameWrap.fixed-scheme #aimRing{display:none !important;}
+
+/* Ability button: fixed directly above the aim stick's fixed base, center-
+   aligned with it, with a hard-coded gap so nothing can ever cover it. */
+#gameWrap.fixed-scheme .fixed-ability-btn{
+  display:flex;
+  position:absolute;z-index:26;pointer-events:auto;cursor:pointer;
+  right:calc(var(--fixed-stick-gutter) + var(--stick-base-r) - (var(--fixed-ability-size) / 2));
+  bottom:calc(var(--fixed-stick-bottom) + (var(--stick-base-r) * 2) + var(--btn-gap));
+  width:var(--fixed-ability-size);height:var(--fixed-ability-size);
+  border-radius:50%;background:rgba(10,18,32,.92);border:2px solid var(--plasma);
+  align-items:center;justify-content:center;font-size:22px;
+  transition:transform .12s ease,opacity .3s ease,border-color .3s ease;
+}
+#gameWrap.fixed-scheme .fixed-ability-btn:active{transform:scale(.92);}
+#gameWrap.fixed-scheme .fixed-ability-btn.on-cd{opacity:.45;border-color:rgba(255,255,255,.22);}
+#gameWrap.fixed-scheme .fixed-ability-btn.ready-pulse{animation:abilityReady 1.1s ease infinite;}
+/* In Floating mode (default) the fixed ability button stays out of the way
+   entirely — the original ability-btn (hidden on touch, see media query
+   above) and the aim stick's outer ring cover ability-triggering there. */
+.fixed-ability-btn{display:none;}
+
+/* Landscape phones: less vertical room, so pull the sticks and the fixed
+   ability button up a bit and tighten the gap so the ability button can't
+   collide with on-screen HUD (ammo/heat readouts) near the bottom edge. */
+@media (orientation:landscape) and (max-height:640px){
+  :root{
+    --stick-base-r:48px;
+    --fixed-stick-bottom:calc(4vh + env(safe-area-inset-bottom));
+    --fixed-ability-size:48px;
+  }
+}
+
 /* boss bar */
 .boss-bar{
   position:absolute;top:76px;left:50%;transform:translateX(-50%);z-index:21;width:min(60vw,420px);display:none;
@@ -814,8 +896,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .changelog-section ul{margin:0;padding-left:18px;}
 .changelog-section li{font-size:12.5px;line-height:1.6;color:var(--dim);margin-bottom:6px;}
 .changelog-section li b{color:var(--tissue);}
-.nb-group{margin-bottom:18px;}
-.nb-group-head{font-family:var(--font-mono);font-size:10px;color:var(--dim);letter-spacing:.08em;margin-bottom:6px;}
+.nb-version-list{display:flex;flex-direction:column;gap:20px;}
+.nb-version-group{padding-bottom:4px;border-bottom:1px solid var(--line);}
+.nb-version-group:last-child{border-bottom:none;}
+.nb-version-head{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px;
+}
+.nb-version-num{font-family:var(--font-mono);font-size:13px;font-weight:800;color:var(--gold);}
+.nb-version-title{font-size:12.5px;font-weight:700;color:var(--tissue);}
+.nb-version-date{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);margin-left:auto;}
+.nb-subgroup-head{
+  font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;margin:10px 0 6px;font-weight:700;
+}
+.nb-subgroup-head.nerf{color:#ff8ea0;}
+.nb-subgroup-head.buff{color:var(--gold);}
 .nb-item{
   display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--dim);
   background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:6px;
@@ -827,8 +921,90 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .nb-item.nerf .nb-tag{background:rgba(255,77,109,.18);color:#ff8ea0;}
 .nb-item.buff .nb-tag{background:rgba(255,209,102,.18);color:var(--gold);}
 .nb-item .nb-body b{color:var(--tissue);}
-.nb-item .nb-ver{font-family:var(--font-mono);font-size:9px;color:var(--dim);opacity:.8;margin-left:4px;}
+.nb-item-structured{flex-direction:row;}
+.nb-item-structured .nb-body{flex:1;display:flex;flex-direction:column;gap:6px;}
+.nb-entity-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.nb-entity-icon{font-size:14px;line-height:1;}
+.nb-entity-name{font-size:12.5px;font-weight:700;color:var(--tissue);}
+.nb-weapon-name{font-family:var(--font-mono);font-size:9.5px;color:var(--dim);padding:1px 6px;border:1px solid var(--line);border-radius:20px;}
+.nb-stat-list{display:flex;flex-direction:column;gap:3px;}
+.nb-stat-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px;}
+.nb-stat-label{color:var(--dim);flex:0 0 auto;}
+.nb-stat-vals{font-family:var(--font-mono);font-size:11px;color:var(--tissue);}
+.nb-stat-before{color:var(--dim);text-decoration:line-through;text-decoration-color:rgba(255,255,255,.25);}
+.nb-stat-after{color:var(--tissue);font-weight:700;}
+.nb-stat-dir{font-size:9px;margin-left:auto;}
+.nb-stat-dir.up{color:var(--gold);}
+.nb-stat-dir.down{color:#ff8ea0;}
+.nb-dps-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px;background:rgba(0,0,0,.25);border-radius:8px;padding:5px 8px;margin-top:2px;}
+.nb-dps-label{color:var(--dim);font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;}
+.nb-dps-vals{font-family:var(--font-mono);font-weight:700;color:var(--tissue);}
+.nb-dps-delta{font-family:var(--font-mono);font-size:10px;margin-left:auto;}
+.nb-dps-row.down .nb-dps-delta{color:#ff8ea0;}
+.nb-dps-row.up .nb-dps-delta{color:var(--gold);}
+.nb-dps-row.flat .nb-dps-delta{color:var(--dim);}
+.nb-note{font-size:11px;color:var(--dim);font-style:italic;}
 .changelog-empty{font-size:12.5px;color:var(--dim);text-align:center;padding:30px 10px;}
+
+/* ------------------------------------------------------------- settings */
+.settings-screen{width:min(94vw,560px);max-height:78vh;overflow-y:auto;padding:4px 2px 12px;}
+.settings-recommend{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:rgba(62,232,200,.08);border:1px solid rgba(62,232,200,.35);border-radius:12px;
+  padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--dim);
+}
+.settings-recommend b{color:var(--plasma);}
+.settings-recommend button{
+  font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em;
+  background:rgba(62,232,200,.16);border:1px solid rgba(62,232,200,.5);color:var(--plasma);
+  border-radius:8px;padding:6px 11px;cursor:pointer;white-space:nowrap;
+}
+.settings-preset-row{display:flex;gap:8px;margin-bottom:16px;}
+.settings-preset-btn{
+  flex:1;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.04em;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--dim);
+  border-radius:10px;padding:10px 4px;cursor:pointer;text-align:center;transition:background .15s,color .15s,border-color .15s;
+}
+.settings-preset-btn:hover{background:rgba(255,255,255,.1);}
+.settings-preset-btn.active{background:rgba(62,232,200,.14);border-color:rgba(62,232,200,.5);color:var(--plasma);}
+.settings-preset-note{font-size:10.5px;color:var(--dim);text-align:center;margin:-8px 0 16px;line-height:1.5;}
+.settings-group{margin-bottom:18px;}
+.settings-group-title{
+  font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--line);
+}
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);
+}
+.settings-row:last-child{border-bottom:none;}
+.settings-row-label{font-size:12.5px;color:var(--tissue);}
+.settings-row-sub{font-size:10px;color:var(--dim);margin-top:2px;line-height:1.4;}
+.settings-toggle{
+  position:relative;width:42px;height:24px;flex:0 0 auto;border-radius:14px;border:1px solid var(--line);
+  background:rgba(255,255,255,.08);cursor:pointer;transition:background .15s,border-color .15s;
+}
+.settings-toggle.on{background:rgba(62,232,200,.35);border-color:rgba(62,232,200,.6);}
+.settings-toggle::after{
+  content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:var(--tissue);transition:transform .15s;
+}
+.settings-toggle.on::after{transform:translateX(18px);}
+.settings-select{
+  font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.03em;
+  background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--tissue);
+  border-radius:8px;padding:6px 9px;cursor:pointer;
+}
+.settings-slider-row{padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);}
+.settings-slider-row input[type=range]{width:100%;margin-top:8px;accent-color:var(--plasma);}
+.settings-slider-val{font-family:var(--font-mono);font-size:10px;color:var(--plasma);float:right;}
+.settings-scheme-toggle{display:flex;gap:6px;flex:0 0 auto;}
+.settings-scheme-btn{
+  font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.03em;
+  background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--dim);
+  border-radius:8px;padding:7px 10px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.settings-scheme-btn.active{background:rgba(62,232,200,.16);border-color:rgba(62,232,200,.5);color:var(--plasma);}
 
 /* unread-update notification dot, shown on the menu button that opens
    the Changelog until the player has actually opened it */
@@ -1008,6 +1184,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="ability-cd-ring" id="abilityCdRing"></div>
       <div class="ability-cd-num" id="abilityCdNum"></div>
     </button>
+    <!-- Fixed control scheme's ability button — always positioned above the
+         aim stick's fixed base (see CSS: #gameWrap.fixed-scheme .fixed-ability-btn).
+         Mirrors abilityBtn's icon/cooldown markup; wired to the same
+         pressAbility() in input.js. Hidden entirely in Floating mode. -->
+    <button class="fixed-ability-btn" id="fixedAbilityBtn">
+      <span id="fixedAbilityIcon">⚙️</span>
+      <div class="ability-cd-ring" id="fixedAbilityCdRing"></div>
+      <div class="ability-cd-num" id="fixedAbilityCdNum"></div>
+    </button>
     <div class="fire-key-hint">SPACE</div>
     <button class="fire-btn" id="fireBtn">FIRE</button>
 
@@ -1038,6 +1223,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <button class="btn ghost small hidden" id="btnRejoin">Rejoin Squad</button>
       <button class="btn ghost small" id="btnHowToFromSplash">How to Play</button>
       <button class="btn ghost small btn-with-notif" id="btnChangelogFromSplash">Changelog<span class="notif-dot hidden" id="changelogNotifDot"></span></button>
+      <button class="btn ghost small" id="btnSettingsFromSplash">Settings</button>
     </div>
     <div class="footnote">Up to 4 players defend a shared body against evolving pathogens. Solo fills empty seats with AI squadmates.</div>
   </div>
@@ -1120,7 +1306,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         </div>
         <div class="howto-copy">
           <div class="howto-title">2. Fire — targeting is automatic</div>
-          <div class="howto-body"><b>Touch:</b> drag on the <b>right half</b> of the screen — past the small dead zone your weapon fires automatically at whatever's nearest and in range. <b>Desktop:</b> hold the red <b>FIRE</b> button or <span class="kbd">SPACE</span>. Either way, no aiming is needed — release to drop the lock, engage again to pick a new target. Each class has a different range; watch the dashed ring while firing.</div>
+          <div class="howto-body"><b>Touch:</b> drag the right-side aim stick — past the small dead zone it fires toward wherever you point it. <b>Desktop:</b> move the mouse to aim, hold left-click or <span class="kbd">SPACE</span> to fire. Aim assist (Settings) gently nudges your shot toward a nearby enemy when you're close but not quite on target — it never fires on its own or picks a target for you. Each class has a different range; watch the dashed ring while firing. An optional tracer line (Settings → Controls) shows exactly where you're aiming.</div>
         </div>
       </div>
 
@@ -1133,7 +1319,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         </div>
         <div class="howto-copy">
           <div class="howto-title">3. Use your ability</div>
-          <div class="howto-body"><b>Touch:</b> drag your fire-stick past the <b>outer dashed ring</b> to trigger your class ability — it fires once per drag-out. <b>Desktop:</b> press <span class="kbd">E</span>, or tap the blue button above FIRE. Abilities never block movement or firing — use it whenever it's glowing and off cooldown.</div>
+          <div class="howto-body"><b>Touch:</b> drag your fire-stick past the <b>outer dashed ring</b> to trigger your class ability (Floating scheme), or tap the ability button locked above your aim stick (Fixed scheme — Settings → Controls). <b>Desktop:</b> press <span class="kbd">E</span>, or tap the blue button above FIRE. Abilities never block movement or firing — use it whenever it's glowing and off cooldown.</div>
         </div>
       </div>
 
@@ -1200,6 +1386,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div class="btn-stack" style="margin-top:12px;"><button class="btn ghost" id="btnChangelogBack">Back</button></div>
   </div>
 
+  <!-- ============================== SETTINGS ========================== -->
+  <div class="screen hidden" id="screenSettings">
+    <div class="cell-sub" style="margin-bottom:8px;">SETTINGS</div>
+    <div class="settings-screen" id="settingsScreenBody">
+      <!-- rendered by ui.js: renderSettingsScreen() -->
+    </div>
+    <div class="btn-stack" style="margin-top:12px;"><button class="btn ghost" id="btnSettingsBack">Back</button></div>
+  </div>
+
   <!-- ============================== PAUSE ============================ -->
   <div class="screen hidden" id="screenPause">
     <div class="cell-title" style="font-size:32px;">PAUSED</div>
@@ -1207,6 +1402,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div class="btn-stack" style="margin-top:8px;">
       <button class="btn" id="btnResume">Resume</button>
       <button class="btn ghost" id="btnPauseHowTo">How to Play</button>
+      <button class="btn ghost" id="btnPauseSettings">Settings</button>
       <button class="btn ghost small" id="btnReplayHints">Replay tutorial hints next run</button>
       <button class="btn danger" id="btnQuit">Abandon Run</button>
     </div>
@@ -1248,6 +1444,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 </div>
 </div>
 <script src="js/core.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/sim.js"></script>

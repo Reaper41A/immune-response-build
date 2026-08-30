@@ -243,9 +243,10 @@ function drawPlayers(view,firingRingFor){
       ctx.restore();
       continue;
     }
-    // range indicator while firing (Phase3 rangeIndicatorRenderer intent):
-    // shows exactly how far auto-lock reaches for YOUR class
-    if(firingRingFor===p.i){
+    // range indicator while firing: shows exactly how far your weapon can
+    // reach so manual aim (or aim assist) knows when a shot can connect.
+    // settings gate: rangeRing
+    if(firingRingFor===p.i&&Settings.rangeRing){
       ctx.save();
       ctx.translate(p.x,p.y);
       ctx.strokeStyle=`rgba(62,232,200,${0.20+Math.sin(t*6)*0.08})`;
@@ -254,6 +255,15 @@ function drawPlayers(view,firingRingFor){
       ctx.beginPath();ctx.arc(0,0,p.rangeCache||clsRange(p),0,Math.PI*2);ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
+    }
+    // aim tracer: a guide line from your cell out to weapon range along
+    // your current aim direction — settings gate: tracer. Only drawn for
+    // the local player while actually aiming/firing (Input.aim is only
+    // guaranteed fresh in that state; see input.js), same condition the
+    // range ring above uses.
+    if(firingRingFor===p.i&&Settings.tracer&&(Input.firing||Input.aiming)){
+      const aimLen=Math.hypot(Input.aim.x,Input.aim.y);
+      if(aimLen>0.01)drawAimTracer(p.x,p.y,Input.aim.x/aimLen,Input.aim.y/aimLen,p.rangeCache||clsRange(p),t);
     }
     ctx.save();
     ctx.translate(p.x,p.y);

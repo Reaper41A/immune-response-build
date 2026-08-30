@@ -166,6 +166,7 @@ let lastRenderTs=0;
    up. Bounded 0.6–1.0, re-evaluates at most every ~1.5s of rendered frames. */
 const PERF={ema:16.7,cool:0,last:0};
 function trackPerf(ts){
+  if(!Settings.autoRes)return; // player picked a fixed resolution — PERF stays hands-off
   if(!PERF.last){PERF.last=ts;return;}
   const d=ts-PERF.last;PERF.last=ts;
   if(d<=0||d>60)return; // ignore tab-switch / stall spikes
@@ -200,9 +201,11 @@ function loop(ts){
   }
   sendInputsIfGuest(dt);
 
-  // …but rendering is capped at ~60fps: on 120Hz phones this halves the
-  // GPU work (and the heat) with zero visual difference at this art scale
-  if(ts-lastRenderTs<15.4)return;
+  // Render cap is settings-driven (Low/Med/High = 60fps for a stable GPU
+  // budget on modest hardware; Ultra lifts this to 120 for high-refresh
+  // displays, since Ultra is explicitly the "device can take it" tier).
+  const capMs=1000/(Settings.frameCap||60);
+  if(ts-lastRenderTs<capMs)return;
   lastRenderTs=ts;
 
   if(App.inRun&&App.paused){ // pause overlay covers the canvas — skip entirely
@@ -399,8 +402,10 @@ function saveName(){
   if(v){App.playerName=v;localStorage.setItem('ir_name',v);}
 }
 let howtoReturn='screenSplash';
+let settingsReturn='screenSplash';
 function wireUi(){
   cacheHudRefs();
+  applyControlScheme(); // apply the player's saved control scheme before the first frame renders
 
   $('btnSolo').addEventListener('click',()=>{AudioSys.play('ui');showScreen('screenSoloSelect');});
   function buildSoloGrid(){
@@ -423,6 +428,8 @@ function wireUi(){
   $('btnConnectBack').addEventListener('click',()=>showScreen('screenSplash'));
   $('btnChangelogFromSplash').addEventListener('click',()=>{openChangelog();});
   $('btnChangelogBack').addEventListener('click',()=>showScreen('screenSplash'));
+  $('btnSettingsFromSplash').addEventListener('click',()=>{settingsReturn='screenSplash';openSettings();});
+  $('btnSettingsBack').addEventListener('click',()=>showScreen(settingsReturn));
   $('btnChangelogTabVersions').addEventListener('click',()=>showChangelogVersionList());
   $('btnChangelogTabNerfsBuffs').addEventListener('click',()=>showChangelogNerfsBuffs());
 
@@ -476,6 +483,7 @@ function wireUi(){
   $('pauseBtn').addEventListener('click',togglePause);
   $('btnResume').addEventListener('click',resumeFromPause);
   $('btnPauseHowTo').addEventListener('click',()=>{howtoReturn='screenPause';showScreen('screenHowTo');});
+  $('btnPauseSettings').addEventListener('click',()=>{settingsReturn='screenPause';openSettings();});
   $('btnReplayHints').addEventListener('click',resetHints);
   $('btnQuit').addEventListener('click',()=>{
     if(App.mode==='mp')leaveToMenu(); // leaveToMenu() exits fullscreen itself

@@ -97,6 +97,11 @@ function updateHumanPlayer(p,dt){
     p.inAim.x=Input.aim.x;p.inAim.y=Input.aim.y;
     p.inFiring=Input.aiming||Input.firing;
     if(Input.skillEdge){p.inSkillEdge=true;Input.skillEdge=false;}
+    // The host's own cell reads its aim-assist preference straight from its
+    // local Settings — it never round-trips through netcode the way a
+    // guest's does (see netcode.js 'pi' handler for guests).
+    p.inAimAssist=Settings.aimAssist;
+    p.inAimAssistStrength=Settings.aimAssistStrength;
   }
   let mx=p.inMove.x,my=p.inMove.y;
   const len=Math.hypot(mx,my);
@@ -131,10 +136,46 @@ function updateHumanPlayer(p,dt){
     // enemy. Project a point far out along that direction — fireWeapon
     // only needs an angle, and this keeps it a straight-line shot that
     // hits whatever's actually in its path, same as before.
-    const tx=p.x+p.inAim.x*1000,ty=p.y+p.inAim.y*1000;
-    p.facing=Math.atan2(p.inAim.y,p.inAim.x);
+    let aimAngle=Math.atan2(p.inAim.y,p.inAim.x);
+    if(p.inAimAssist&&p.inAimAssistStrength>0){
+      aimAngle=applyAimAssist(p,aimAngle);
+    }
+    const tx=p.x+Math.cos(aimAngle)*1000,ty=p.y+Math.sin(aimAngle)*1000;
+    p.facing=aimAngle;
     if(p.fireCd<=0&&canFire(p))fireWeapon(p,tx,ty);
   }
+}
+
+/* ---------------------------------------------------------------- aim assist
+   Soft magnetism, not a lock: finds the best enemy inside a narrow cone in
+   front of the raw aim direction and within weapon range, then rotates the
+   fired angle a fraction of the way toward it. Nothing here overrides the
+   player's own direction when no qualifying target exists, and the cone is
+   tight enough that it nudges a near-miss onto target rather than snapping
+   across the screen at an unrelated enemy. Strength is fully player-tunable
+   (Settings tab) — 0 disables it, 1 aims almost straight at the best target
+   inside the cone. */
+const AIM_ASSIST_CONE=0.26; // ~15 degrees half-angle either side of raw aim
+function applyAimAssist(p,rawAngle){
+  const range=p.range||99999;
+  let bestAngTo=null,bestScore=Infinity;
+  for(const en of SIM.enemies){
+    if(!en.alive)continue;
+    const d=dist(p.x,p.y,en.x,en.y);
+    if(d>range)continue;
+    const angTo=angleTo(p.x,p.y,en.x,en.y);
+    let diff=Math.abs(angTo-rawAngle);
+    if(diff>Math.PI)diff=Math.PI*2-diff;
+    if(diff>AIM_ASSIST_CONE)continue;
+    // prefer the target closest to dead-center of the cone, tie-broken by distance
+    const score=diff*400+d*0.15;
+    if(score<bestScore){bestScore=score;bestAngTo=angTo;}
+  }
+  if(bestAngTo==null)return rawAngle;
+  let diff=bestAngTo-rawAngle;
+  while(diff>Math.PI)diff-=Math.PI*2;
+  while(diff<-Math.PI)diff+=Math.PI*2;
+  return rawAngle+diff*clamp(p.inAimAssistStrength!=null?p.inAimAssistStrength:0.5,0,1);
 }
 
 /* Movement-only tick used while a draft screen is up: squadmates can walk

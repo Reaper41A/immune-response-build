@@ -287,6 +287,11 @@ function handleServerMsg(msg){
         p.inFiring=!!msg.f;
         if(msg.a)p.inAbility=true;
         if(msg.sk)p.inSkillEdge=true;
+        // Aim assist is per-player (each guest's own Settings), not the
+        // host's — default to assist-on at 50% for older cached clients
+        // that predate this field, matching DEFAULT_SETTINGS.
+        p.inAimAssist=msg.aa!=null?!!msg.aa:true;
+        p.inAimAssistStrength=msg.aas!=null?clamp(msg.aas/100,0,1):0.5;
       }
       break;
     }
@@ -347,6 +352,13 @@ function sendInputsIfGuest(dt){
     f:(inp.firing||inp.aiming)?1:0,
     a:inp.abilityEdge?1:0,
     sk:inp.skillEdge?1:0,
+    // Aim assist is a per-player preference (Settings tab), so each guest
+    // sends its OWN choice rather than the host's — without this, whichever
+    // machine happened to be hosting would silently decide aim assist for
+    // the entire squad regardless of what a guest picked in their own
+    // Settings screen.
+    aa:Settings.aimAssist?1:0,
+    aas:Math.round(clamp(Settings.aimAssistStrength,0,1)*100),
   });
   inp.abilityEdge=false;
   inp.skillEdge=false;

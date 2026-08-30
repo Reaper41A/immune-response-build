@@ -13,6 +13,7 @@ function cacheHudRefs(){
    'organIcons','debuffRow','bossBar','bossName','bossFill','squadPanel',
    'weaponName','ammoFill','ammoLabel','heatFill','heatLabel','ammoBanner',
    'abilityBtn','abilityIcon','abilityCdRing','abilityCdNum','fireBtn',
+   'fixedAbilityBtn','fixedAbilityIcon','fixedAbilityCdRing','fixedAbilityCdNum',
    'aimRing','vignetteLow'].forEach(id=>HUDREF[id]=$(id));
 }
 let hudSlowTimer=0;
@@ -87,6 +88,17 @@ function updateAbilityButton(me){
   HUDREF.abilityCdNum.textContent=me.ac>0?Math.ceil(me.ac):'';
   HUDREF.abilityBtn.classList.toggle('on-cd',me.ac>0);
   HUDREF.abilityBtn.classList.toggle('ready-pulse',!(me.ac>0));
+  // Fixed control scheme's ability button mirrors the same state — it's a
+  // separate DOM node (see CSS: only one of the two is ever visible at a
+  // time, gated by Settings.controlScheme) but both need to agree on
+  // cooldown/ready visuals so switching schemes mid-run never looks stale.
+  if(HUDREF.fixedAbilityBtn){
+    HUDREF.fixedAbilityIcon.textContent=ab.icon;
+    HUDREF.fixedAbilityCdRing.style.setProperty('--pct',(cdFrac*100)+'%');
+    HUDREF.fixedAbilityCdNum.textContent=me.ac>0?Math.ceil(me.ac):'';
+    HUDREF.fixedAbilityBtn.classList.toggle('on-cd',me.ac>0);
+    HUDREF.fixedAbilityBtn.classList.toggle('ready-pulse',!(me.ac>0));
+  }
   // The ability button itself is hidden on touch (skill now triggers via
   // the aim-stick outer ring), but the cooldown is still real information
   // — without this, a touch player dragging out to trigger the skill
@@ -179,7 +191,7 @@ function buildOrganIcons(){
    the fix for the intrusive coach-mark tutorial the prototype dropped. */
 const HINT_DEFS={
   move:{icon:'🕹️',html:'Drag anywhere on the <b>left half</b> to move — or <span class="kbd">WASD</span>.'},
-  fire:{icon:'🔥',html:'Hold <b>FIRE</b> (or <span class="kbd">SPACE</span>) — the nearest pathogen <b>in range</b> locks automatically. The dashed ring is your range.'},
+  fire:{icon:'🔥',html:'Aim with your mouse or the right-side stick, then hold <b>FIRE</b> (or <span class="kbd">SPACE</span>/click) — the dashed ring is your weapon\'s range. Aim assist nudges close shots onto target.'},
   switch:{icon:'🎯',html:'Release fire to drop your lock; hold again to switch targets.'},
   ammo:{icon:'🟢',html:'Green motes = <b>organic matter</b>. Walk over them to reload ammo.'},
   heat:{icon:'🌡️',html:'Heat climbs as you fire — ease off before it <b>overheats</b> and jams.'},

@@ -380,3 +380,214 @@ function togglePause(){
   }
 }
 function resumeFromPause(){App.paused=false;showScreen(null);}
+
+/* ---------------------------------------------------------------- settings */
+function openSettings(){
+  AudioSys.play('ui');
+  renderSettingsScreen();
+  showScreen('screenSettings');
+}
+
+const SETTINGS_PRESET_ORDER=['low','medium','high','ultra'];
+const SETTINGS_PRESET_LABELS={low:'Low',medium:'Medium',high:'High',ultra:'Ultra'};
+
+/* Toggle rows: [settingKey, label, sublabel]. Grouped to match settings.js
+   comment sections so the UI and the data file stay easy to cross-reference. */
+const SETTINGS_TOGGLE_GROUPS=[
+  {title:'Resolution & Performance',rows:[
+    ['autoRes','Auto resolution','Let the game adapt resolution live to keep frame time steady. Turn off to lock in your own choice.'],
+  ]},
+  {title:'Particles & Effects',rows:[
+    ['particles','Particles','Hit sparks, death bursts, muzzle flashes, EP motes.'],
+    ['destructionParticles','Destruction debris','Extra jagged fragments thrown out when something dies, on top of regular particles.'],
+    ['screenShake','Screen shake','Camera kick on leaks and big hits.'],
+    ['hitFlash','Damage/heal flash','Full-screen red/green flash vignette when you take damage or get healed.'],
+  ]},
+  {title:'World',rows:[
+    ['backgroundFx','Background ambience','Drifting glow motes and large organism silhouettes passing overhead.'],
+    ['veins','Capillary veins','Pulsing vein network under the arena, synced to the Body\u2019s heartbeat.'],
+  ]},
+  {title:'UI & Readability',rows:[
+    ['damageText','Damage text','Floating damage/heal/EP numbers.'],
+    ['calloutFeed','Callout feed','Text callouts for downs, mimics, wave clears, squad buys.'],
+    ['rangeRing','Range ring','Dashed ring around your cell showing your weapon\u2019s range while firing.'],
+  ]},
+  {title:'Aim Assist',rows:[
+    ['aimAssist','Aim assist','Gently bends your aim toward a nearby enemy inside a narrow cone in front of your cursor/stick. Never overrides your own direction if nothing qualifies.'],
+  ]},
+];
+
+function settingsRowToggleHtml(key,label,sub){
+  const on=!!Settings[key];
+  return `<div class="settings-row" data-toggle="${key}">
+    <div><div class="settings-row-label">${escapeHtml(label)}</div>${sub?`<div class="settings-row-sub">${escapeHtml(sub)}</div>`:''}</div>
+    <div class="settings-toggle ${on?'on':''}" data-key="${key}"></div>
+  </div>`;
+}
+
+function renderSettingsScreen(){
+  const body=$('settingsScreenBody');
+  if(!body)return;
+  const rec=recommendedPresetLabel();
+  const recKey=estimateDeviceTier();
+
+  let html='';
+  html+=`<div class="settings-recommend">
+    <div>Recommended for this device: <b>${escapeHtml(rec)}</b></div>
+    ${Settings.preset===recKey?'':`<button id="btnApplyRecommended" data-preset="${recKey}">Use ${escapeHtml(rec)}</button>`}
+  </div>`;
+
+  html+='<div class="settings-preset-row">'+SETTINGS_PRESET_ORDER.map(p=>
+    `<button class="settings-preset-btn ${Settings.preset===p?'active':''}" data-preset="${p}">${SETTINGS_PRESET_LABELS[p]}</button>`
+  ).join('')+'</div>';
+  html+=`<div class="settings-preset-note">${settingsPresetBlurb()}</div>`;
+
+  html+=`<div class="settings-group">
+    <div class="settings-group-title">Resolution</div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Render scale</div><div class="settings-row-sub">Backing-store framebuffer size. Higher looks sharper, costs more GPU time.</div></div>
+      <select class="settings-select" id="selResScale" ${Settings.autoRes?'disabled':''}>
+        ${[0.6,0.7,0.8,0.9,1].map(v=>`<option value="${v}" ${Math.abs(Settings.resScale-v)<0.01?'selected':''}>${Math.round(v*100)}%</option>`).join('')}
+      </select>
+    </div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Sharpness (pixel density)</div><div class="settings-row-sub">Caps how many real device pixels the game draws per screen pixel. Low intentionally softens/blurs high-density screens to save GPU work; Ultra draws native-sharp.</div></div>
+      <select class="settings-select" id="selDprCap">
+        ${[1,1.5,2,3].map(v=>`<option value="${v}" ${Settings.dprCap===v?'selected':''}>${dprLabel(v)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Frame rate cap</div><div class="settings-row-sub">Ultra unlocks 120fps for high-refresh screens.</div></div>
+      <select class="settings-select" id="selFrameCap">
+        ${[30,60,120].map(v=>`<option value="${v}" ${Settings.frameCap===v?'selected':''}>${v} fps</option>`).join('')}
+      </select>
+    </div>
+    ${settingsRowToggleHtml('autoRes','Auto resolution','Let the game adapt resolution live to keep frame time steady instead of using the fixed value above.')}
+  </div>`;
+
+  html+=`<div class="settings-group">
+    <div class="settings-group-title">Particles</div>
+    <div class="settings-slider-row">
+      <div class="settings-row-label">Particle density <span class="settings-slider-val" id="particleDensityVal">${Math.round(Settings.particleDensity*100)}%</span></div>
+      <input type="range" id="rngParticleDensity" min="0.35" max="1.4" step="0.05" value="${Settings.particleDensity}">
+    </div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Glow / bloom quality</div><div class="settings-row-sub">Muzzle flashes, projectile glow, core pulse.</div></div>
+      <select class="settings-select" id="selGlowQuality">
+        <option value="off" ${Settings.glowQuality==='off'?'selected':''}>Off</option>
+        <option value="reduced" ${Settings.glowQuality==='reduced'?'selected':''}>Reduced</option>
+        <option value="full" ${Settings.glowQuality==='full'?'selected':''}>Full</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Projectile trail length</div><div class="settings-row-sub">The one deliberate motion-blur streak in the game, so tracking shots stays readable — never removed, just shortened.</div></div>
+      <select class="settings-select" id="selTrailLength">
+        <option value="short" ${Settings.trailLength==='short'?'selected':''}>Short</option>
+        <option value="long" ${Settings.trailLength==='long'?'selected':''}>Long</option>
+      </select>
+    </div>
+    ${SETTINGS_TOGGLE_GROUPS[1].rows.map(r=>settingsRowToggleHtml(...r)).join('')}
+  </div>`;
+
+  html+=`<div class="settings-group"><div class="settings-group-title">${SETTINGS_TOGGLE_GROUPS[2].title}</div>${SETTINGS_TOGGLE_GROUPS[2].rows.map(r=>settingsRowToggleHtml(...r)).join('')}</div>`;
+  html+=`<div class="settings-group"><div class="settings-group-title">${SETTINGS_TOGGLE_GROUPS[3].title}</div>${SETTINGS_TOGGLE_GROUPS[3].rows.map(r=>settingsRowToggleHtml(...r)).join('')}</div>`;
+
+  html+=`<div class="settings-group">
+    <div class="settings-group-title">Controls</div>
+    <div class="settings-row">
+      <div><div class="settings-row-label">Touch control scheme</div><div class="settings-row-sub">${Settings.controlScheme==='fixed'?'Fixed: both sticks have a permanent base position, and the ability button is locked above the aim stick so it can never get covered.':'Floating: sticks appear wherever you first touch, like before.'}</div></div>
+      <div class="settings-scheme-toggle">
+        <button class="settings-scheme-btn ${Settings.controlScheme==='floating'?'active':''}" data-scheme="floating">Floating</button>
+        <button class="settings-scheme-btn ${Settings.controlScheme==='fixed'?'active':''}" data-scheme="fixed">Fixed</button>
+      </div>
+    </div>
+    ${settingsRowToggleHtml('tracer','Aim tracer','A guide line from your cell out to your weapon\u2019s range, along your current aim.')}
+    <div class="settings-row">
+      <div><div class="settings-row-label">Tracer style</div></div>
+      <select class="settings-select" id="selTracerStyle" ${Settings.tracer?'':'disabled'}>
+        <option value="laser" ${Settings.tracerStyle==='laser'?'selected':''}>Laser</option>
+        <option value="solid" ${Settings.tracerStyle==='solid'?'selected':''}>Solid</option>
+        <option value="dotted" ${Settings.tracerStyle==='dotted'?'selected':''}>Dotted</option>
+        <option value="segmented" ${Settings.tracerStyle==='segmented'?'selected':''}>Segmented</option>
+        <option value="pulse" ${Settings.tracerStyle==='pulse'?'selected':''}>Pulse</option>
+      </select>
+    </div>
+  </div>`;
+
+  html+=`<div class="settings-group">
+    <div class="settings-group-title">Aim Assist</div>
+    ${settingsRowToggleHtml('aimAssist','Aim assist',SETTINGS_TOGGLE_GROUPS[4].rows[0][2])}
+    <div class="settings-slider-row">
+      <div class="settings-row-label">Assist strength <span class="settings-slider-val" id="aimAssistStrengthVal">${Math.round(Settings.aimAssistStrength*100)}%</span></div>
+      <input type="range" id="rngAimAssistStrength" min="0" max="1" step="0.05" value="${Settings.aimAssistStrength}" ${Settings.aimAssist?'':'disabled'}>
+    </div>
+  </div>`;
+
+  body.innerHTML=html;
+  wireSettingsControls();
+}
+
+function dprLabel(v){
+  return{1:'Soft (1x)',1.5:'1.5x',2:'2x (default)',3:'Sharp (native)'}[v]||(v+'x');
+}
+function settingsPresetBlurb(){
+  const blurbs={
+    low:'Smallest, softest image and the fewest effects — built to keep frame time steady on weak/hot hardware.',
+    medium:'Sharper and busier than Low, but still trims the priciest ambient layers for mid-range devices.',
+    high:'Full resolution, full particle budget, ambience and veins on — this is how the game is meant to look.',
+    ultra:'Everything High has, plus native pixel density, boosted particle density, and a 120fps cap for high-refresh screens.',
+    custom:'Custom mix of settings — pick a preset above to reset to a known-good baseline.',
+  };
+  return blurbs[Settings.preset]||blurbs.custom;
+}
+
+function wireSettingsControls(){
+  const body=$('settingsScreenBody');
+  if(!body)return;
+  body.querySelectorAll('.settings-preset-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{AudioSys.play('ui');applyPreset(btn.dataset.preset);});
+  });
+  const recBtn=$('btnApplyRecommended');
+  if(recBtn)recBtn.addEventListener('click',()=>{AudioSys.play('ui');applyPreset(recBtn.dataset.preset);});
+  body.querySelectorAll('.settings-toggle').forEach(t=>{
+    t.addEventListener('click',()=>{
+      AudioSys.play('ui');
+      setSetting(t.dataset.key,!Settings[t.dataset.key]);
+    });
+  });
+  const resSel=$('selResScale');
+  if(resSel)resSel.addEventListener('change',()=>setSetting('resScale',parseFloat(resSel.value)));
+  const dprSel=$('selDprCap');
+  if(dprSel)dprSel.addEventListener('change',()=>setSetting('dprCap',parseFloat(dprSel.value)));
+  const fcSel=$('selFrameCap');
+  if(fcSel)fcSel.addEventListener('change',()=>setSetting('frameCap',parseInt(fcSel.value,10)));
+  const glowSel=$('selGlowQuality');
+  if(glowSel)glowSel.addEventListener('change',()=>setSetting('glowQuality',glowSel.value));
+  const trailSel=$('selTrailLength');
+  if(trailSel)trailSel.addEventListener('change',()=>setSetting('trailLength',trailSel.value));
+  body.querySelectorAll('.settings-scheme-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{AudioSys.play('ui');setSetting('controlScheme',btn.dataset.scheme);});
+  });
+  const tracerSel=$('selTracerStyle');
+  if(tracerSel)tracerSel.addEventListener('change',()=>setSetting('tracerStyle',tracerSel.value));
+  const pdRange=$('rngParticleDensity');
+  if(pdRange){
+    // 'input' fires continuously while dragging — update the label + Settings
+    // + persist without rebuilding the DOM (skipRender), so the thumb never
+    // jumps under the finger/cursor mid-drag. 'change' (on release) does one
+    // full re-render so preset buttons/labels catch up to the final value.
+    pdRange.addEventListener('input',()=>{
+      $('particleDensityVal').textContent=Math.round(pdRange.value*100)+'%';
+      setSetting('particleDensity',parseFloat(pdRange.value),true);
+    });
+    pdRange.addEventListener('change',()=>setSetting('particleDensity',parseFloat(pdRange.value)));
+  }
+  const aaRange=$('rngAimAssistStrength');
+  if(aaRange){
+    aaRange.addEventListener('input',()=>{
+      $('aimAssistStrengthVal').textContent=Math.round(aaRange.value*100)+'%';
+      setSetting('aimAssistStrength',parseFloat(aaRange.value),true);
+    });
+    aaRange.addEventListener('change',()=>setSetting('aimAssistStrength',parseFloat(aaRange.value)));
+  }
+}

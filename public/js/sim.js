@@ -51,6 +51,7 @@ function makePlayerEntity(pid,name,clsKey,isBot){
     alive:true,respawnTimer:0,kills:0,
     lockId:null,lockRef:null,
     inMove:{x:0,y:0},inAim:{x:0,y:0},inFiring:false,inAbility:false,inSkillEdge:false,
+    inAimAssist:true,inAimAssistStrength:0.5, // overwritten per-tick by flow.js/netcode.js once real input arrives
     wanderA:rand(0,Math.PI*2),
   };
 }
