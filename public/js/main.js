@@ -254,7 +254,7 @@ function runBootGate(onDone){
         diamond=$('bgDiamond'),slash=$('bgSlash'),nodeL=$('bgNodeL'),nodeR=$('bgNodeR'),
         emblem=$('bgEmblem'),glow=$('bootGateGlow'),sceneWrap=$('bootGateSceneWrap'),
         word=$('bootGateWord'),sub=$('bootGateSub'),skip=$('bootGateSkip'),
-        wordBlock=$('bootGateWordBlock'),promptEl=$('bootGatePrompt');
+        promptEl=$('bootGatePrompt');
 
   let launched=false,done=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -345,7 +345,7 @@ function runBootGate(onDone){
 
     // A brief gloss sweep passes over the studio name once it's settled,
     // giving the hold some life before the whole card zooms out.
-    wordBlock.classList.add('gloss');
+    word.classList.add('gloss');
     await wait(1400);
 
     finish();
