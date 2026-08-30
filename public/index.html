@@ -70,6 +70,117 @@ html,body{height:100vh;height:100svh;height:100dvh;}
 #gameWrap{position:relative;width:100%;height:100%;max-width:2400px;max-height:1400px;}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 
+/* ======================================================================
+   BOOT GATE — mandatory pre-splash screen.
+   Every entry point (fresh load OR a #join=CODE invite link) renders this
+   FIRST, on top of everything else (z-index above .screen's 50). Its whole
+   purpose is to force one real user gesture before anything else can run,
+   so AudioSys.init() — which WebAudio's autoplay policy requires to be
+   called from inside a user-gesture handler — is *guaranteed* to fire
+   instead of depending on the player happening to click something first.
+   Nothing under it (including the invite auto-routing in main.js) is wired
+   up until this resolves. See #bootGate handling in main.js.
+   ====================================================================== */
+#bootGate{
+  position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;
+  background:radial-gradient(ellipse at 50% 42%,rgba(26,44,68,.45),rgba(5,8,15,1) 78%);
+  cursor:pointer;
+  transition:opacity .4s ease;
+}
+#bootGate.hidden{display:none;}
+#bootGate.fading{opacity:0;pointer-events:none;}
+
+#bootGateCenter{position:relative;width:min(78vw,460px);height:min(78vw,460px);
+  display:flex;align-items:center;justify-content:center;}
+#bootGateSceneWrap{position:absolute;inset:0;}
+#bootGateScene{width:100%;height:100%;display:block;position:relative;z-index:1;overflow:visible;}
+#bootGateGlow{
+  position:absolute;left:50%;top:50%;width:60px;height:60px;
+  transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,var(--plasma),transparent 70%);
+  opacity:0;pointer-events:none;filter:blur(14px);z-index:0;
+}
+#bootGateGlow.pulse{animation:bgGlowPulse 2.8s ease-in-out infinite;}
+@keyframes bgGlowPulse{0%,100%{opacity:.28;width:230px;height:230px;}50%{opacity:.5;width:290px;height:290px;}}
+
+#bgRing{stroke:var(--tissue);transform-origin:center;fill:none;stroke-dasharray:1602;stroke-dashoffset:1602;opacity:0;}
+#bgRing.draw{animation:bgRingDraw 1.35s cubic-bezier(.25,.7,.2,1) forwards;}
+@keyframes bgRingDraw{0%{opacity:1;stroke-dashoffset:1602;}100%{opacity:1;stroke-dashoffset:0;}}
+#bgRing.gapped{transition:stroke-dasharray .4s ease-out;stroke-dasharray:200.28 129.31 671.80 129.31 471.52;}
+
+#bgHBarL{transform:translateY(-320px);opacity:0;}
+#bgHBarR{transform:translateY(320px);opacity:0;}
+#bgHBarM{transform:scaleX(0);opacity:0;transform-origin:center;}
+#bgHBarL.slide{animation:bgSlideDown .65s cubic-bezier(.3,1.6,.3,1) forwards;}
+#bgHBarR.slide{animation:bgSlideUp .65s cubic-bezier(.3,1.6,.3,1) forwards;}
+#bgHBarM.slide{animation:bgGrowX .55s cubic-bezier(.3,1.6,.3,1) forwards;}
+@keyframes bgSlideDown{0%{transform:translateY(-320px);opacity:0;}65%{transform:translateY(14px);opacity:1;}100%{transform:translateY(0);opacity:1;}}
+@keyframes bgSlideUp{0%{transform:translateY(320px);opacity:0;}65%{transform:translateY(-14px);opacity:1;}100%{transform:translateY(0);opacity:1;}}
+@keyframes bgGrowX{0%{transform:scaleX(0);opacity:0;}70%{transform:scaleX(1.08);opacity:1;}100%{transform:scaleX(1);opacity:1;}}
+
+#bgDiamond{transform:translateY(-200px) rotate(-140deg) scale(.2);opacity:0;transform-origin:center;}
+#bgDiamond.drop{animation:bgDiamondDrop .8s cubic-bezier(.3,1.7,.3,1) forwards;}
+@keyframes bgDiamondDrop{0%{transform:translateY(-200px) rotate(-140deg) scale(.2);opacity:0;}65%{transform:translateY(10px) rotate(10deg) scale(1.18);opacity:1;}100%{transform:translateY(0) rotate(0deg) scale(1);opacity:1;}}
+
+#bgSlash{opacity:0;stroke-dasharray:70;stroke-dashoffset:70;}
+#bgSlash.flash{animation:bgSlashFlash .4s ease-out forwards;}
+@keyframes bgSlashFlash{0%{opacity:0;stroke-dashoffset:70;}40%{opacity:1;}100%{opacity:1;stroke-dashoffset:0;}}
+
+.bg-node{opacity:0;transform:scale(0);transform-origin:center;}
+.bg-node.pop{animation:bgNodePop .45s cubic-bezier(.34,1.6,.4,1) forwards;}
+@keyframes bgNodePop{0%{opacity:0;transform:scale(0);}60%{opacity:1;transform:scale(1.5);}100%{opacity:1;transform:scale(1);}}
+
+#bgEmblem{transform-origin:center;}
+#bgEmblem.punch{animation:bgLockPunch .35s cubic-bezier(.3,1.6,.3,1) forwards;}
+@keyframes bgLockPunch{0%{transform:scale(1);}40%{transform:scale(1.06);}100%{transform:scale(1);}}
+#bgEmblem{filter:drop-shadow(0 0 0 rgba(62,232,200,0));}
+#bgEmblem.lit{animation:bgColorPulse 2.6s ease-in-out .2s infinite;}
+@keyframes bgColorPulse{0%,100%{filter:drop-shadow(0 0 10px rgba(62,232,200,.25));}50%{filter:drop-shadow(0 0 22px rgba(62,232,200,.55));}}
+
+#bootGateWord{
+  position:relative;margin-top:26px;display:flex;flex-direction:column;align-items:center;
+  font-family:'Arial Narrow',var(--font-ui);
+  font-size:clamp(26px,7vw,52px);font-weight:800;letter-spacing:.05em;
+  color:var(--tissue);text-align:center;line-height:1.05;text-transform:uppercase;
+  text-shadow:0 0 22px rgba(62,232,200,.3);
+  opacity:0;
+}
+#bootGateWord.slam{animation:bgWordSlam .55s cubic-bezier(.2,.9,.25,1) forwards;}
+@keyframes bgWordSlam{0%{opacity:0;transform:translateY(6px) scale(1.4);letter-spacing:.3em;}60%{opacity:1;}100%{opacity:1;transform:translateY(0) scale(1);letter-spacing:.06em;}}
+#bootGateWord b{font-weight:800;background:linear-gradient(135deg,var(--plasma),var(--antibody));
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+#bootGateSub{margin-top:12px;font-family:var(--font-mono);font-size:clamp(9px,1.5vw,13px);
+  letter-spacing:.3em;text-transform:uppercase;color:var(--dim);opacity:0;}
+#bootGateSub.slam{animation:bgRiseIn .5s ease .3s forwards;}
+@keyframes bgRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:.85;transform:translateY(0);}}
+
+/* -------------------------------------------------- ready-to-launch prompt */
+#bootGatePrompt{
+  position:relative;margin-top:34px;display:flex;flex-direction:column;align-items:center;gap:10px;
+  animation:bgPromptIn .5s ease .1s both;
+}
+@keyframes bgPromptIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+#bootGateBtn{
+  appearance:none;border:none;cursor:pointer;font-family:var(--font-ui);
+  font-size:16px;font-weight:700;letter-spacing:.03em;
+  padding:15px 34px;border-radius:14px;min-height:52px;
+  color:#04140f;background:linear-gradient(135deg,var(--plasma),var(--antibody));
+  box-shadow:0 8px 26px -10px rgba(62,232,200,.55),inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform .14s ease,box-shadow .14s ease,filter .14s ease;
+  animation:bgBtnPulse 2.2s ease-in-out infinite;
+}
+#bootGateBtn:hover{transform:translateY(-1px);filter:brightness(1.06);}
+#bootGateBtn:active{transform:scale(.97);}
+@keyframes bgBtnPulse{0%,100%{box-shadow:0 8px 26px -10px rgba(62,232,200,.55),inset 0 1px 0 rgba(255,255,255,.35);}50%{box-shadow:0 8px 34px -6px rgba(62,232,200,.8),inset 0 1px 0 rgba(255,255,255,.5);}}
+#bootGateHint{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);}
+
+#bootGateSkip{
+  position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,.28);cursor:pointer;padding:8px 12px;
+}
+
 /* ------------------------------------------------------------- screens */
 .screen{
   position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;
@@ -705,6 +816,45 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 </style>
 </head>
 <body>
+
+<!-- ==========================================================================
+     BOOT GATE — renders before anything else, on EVERY entry point (fresh
+     load and #join=CODE invite links alike). See CSS block above and the
+     wiring in main.js for why this exists: it forces one real tap before
+     the game boots, which both plays the studio logo and guarantees audio
+     unlocks reliably instead of depending on incidental clicks later.
+     ========================================================================== -->
+<div id="bootGate">
+  <div id="bootGateCenter">
+    <div id="bootGateSceneWrap">
+      <div id="bootGateGlow"></div>
+      <svg id="bootGateScene" viewBox="-280 -280 560 560" xmlns="http://www.w3.org/2000/svg">
+        <g id="bgEmblem">
+          <circle id="bgRing" cx="0" cy="0" r="255" fill="none" stroke-width="26"/>
+          <g id="bgHGroup" stroke="var(--tissue)" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <path id="bgHBarL" d="M -145 -145 L -145 145"/>
+            <path id="bgHBarR" d="M 145 -145 L 145 145"/>
+            <path id="bgHBarM" d="M -145 0 L 145 0"/>
+          </g>
+          <path id="bgDiamond" d="M 0 -72 L 72 0 L 0 72 L -72 0 Z" fill="#05080f" stroke="var(--tissue)" stroke-width="18"/>
+          <path id="bgSlash" d="M -35 35 L 35 -35" fill="none" stroke="var(--tissue)" stroke-width="18" stroke-linecap="round"/>
+          <circle id="bgNodeL" class="bg-node" cx="-218" cy="0" r="10" fill="var(--tissue)"/>
+          <circle id="bgNodeR" class="bg-node" cx="218" cy="0" r="10" fill="var(--tissue)"/>
+        </g>
+      </svg>
+    </div>
+    <div id="bootGateWord"><b>HOWTZER</b> GAMES</div>
+  </div>
+  <div id="bootGateSub">Studio</div>
+
+  <div id="bootGatePrompt">
+    <button id="bootGateBtn" type="button">Ready to Launch</button>
+    <div id="bootGateHint">Tap to load audio &amp; enter Immune Response</div>
+  </div>
+
+  <div id="bootGateSkip">Tap anywhere to skip</div>
+</div>
+
 <div id="app">
 <div id="gameWrap">
   <canvas id="gameCanvas"></canvas>

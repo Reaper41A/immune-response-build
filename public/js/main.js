@@ -237,6 +237,132 @@ function loop(ts){
   trackPerf(ts);
 }
 
+/* ---------------------------------------------------------------- boot gate
+   Studio-logo screen shown before ANYTHING else, on every entry point. Two
+   jobs:
+     1) Force one real user gesture up front so AudioSys.init() — which
+        WebAudio's autoplay policy requires to run inside a gesture handler —
+        fires reliably instead of depending on incidental clicks later, and
+     2) Play the Howtzer Games logo assembly (reused from the standalone
+        emblem animation) as a proper studio splash.
+   `onDone` is called exactly once, after the gate fades out — main.js passes
+   it wireUi, so nothing else boots (menus, invite auto-routing, the render
+   loop) until this has resolved. */
+function runBootGate(onDone){
+  const gate=$('bootGate');
+  const ring=$('bgRing'),hBarL=$('bgHBarL'),hBarR=$('bgHBarR'),hBarM=$('bgHBarM'),
+        diamond=$('bgDiamond'),slash=$('bgSlash'),nodeL=$('bgNodeL'),nodeR=$('bgNodeR'),
+        emblem=$('bgEmblem'),glow=$('bootGateGlow'),sceneWrap=$('bootGateSceneWrap'),
+        word=$('bootGateWord'),sub=$('bootGateSub'),skip=$('bootGateSkip'),
+        promptEl=$('bootGatePrompt');
+
+  let launched=false,done=false;
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+  function bgTone({freq=440,dur=.3,type='sine',gain=.15,glideTo=null,delay=0,attack=.01}={}){
+    if(!AudioSys.ctx)return;
+    const t0=AudioSys.ctx.currentTime+delay;
+    const osc=AudioSys.ctx.createOscillator(),g=AudioSys.ctx.createGain();
+    osc.type=type;osc.frequency.setValueAtTime(freq,t0);
+    if(glideTo)osc.frequency.exponentialRampToValueAtTime(glideTo,t0+dur);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(gain,t0+attack);
+    g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    osc.connect(g);g.connect(AudioSys.gain||AudioSys.ctx.destination);
+    osc.start(t0);osc.stop(t0+dur+.05);
+  }
+  function bgNoise({dur=.12,gain=.18,delay=0,freq=180}={}){
+    if(!AudioSys.ctx)return;
+    const t0=AudioSys.ctx.currentTime+delay;
+    const len=Math.max(1,Math.floor(AudioSys.ctx.sampleRate*dur));
+    const buf=AudioSys.ctx.createBuffer(1,len,AudioSys.ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len);
+    const src=AudioSys.ctx.createBufferSource();src.buffer=buf;
+    const flt=AudioSys.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=freq;
+    const g=AudioSys.ctx.createGain();g.gain.setValueAtTime(gain,t0);
+    g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    src.connect(flt);flt.connect(g);g.connect(AudioSys.gain||AudioSys.ctx.destination);
+    src.start(t0);
+  }
+
+  async function playSequence(){
+    ring.classList.add('draw');
+    bgTone({freq:180,glideTo:520,dur:.9,gain:.06,attack:.15});
+    await wait(1250);
+
+    ring.classList.add('gapped');
+    bgNoise({dur:.15,gain:.15,freq:900});
+    await wait(500);
+
+    hBarL.classList.add('slide');hBarR.classList.add('slide');
+    bgNoise({dur:.14,gain:.22,freq:220});bgTone({freq:110,dur:.18,type:'triangle',gain:.1});
+    await wait(420);
+    hBarM.classList.add('slide');
+    await wait(600);
+
+    diamond.classList.add('drop');
+    bgNoise({dur:.22,gain:.28,freq:160});bgTone({freq:80,dur:.4,gain:.18,attack:.005});
+    await wait(680);
+
+    slash.classList.add('flash');
+    bgTone({freq:1400,glideTo:2600,dur:.14,type:'sawtooth',gain:.05});
+    await wait(320);
+
+    nodeL.classList.add('pop');nodeR.classList.add('pop');
+    bgTone({freq:1200,dur:.12,gain:.08});
+    await wait(400);
+
+    emblem.classList.add('punch');
+    glow.style.transition='opacity .5s ease';glow.style.opacity='1';
+    emblem.classList.add('lit');glow.classList.add('pulse');
+    bgTone({freq:220,dur:.6,gain:.16,attack:.01});
+    bgTone({freq:330,dur:.6,gain:.1,delay:.02});
+    bgTone({freq:440,dur:.7,gain:.08,delay:.04});
+
+    await wait(1400);
+
+    glow.classList.remove('pulse');glow.classList.add('outro');
+    sceneWrap.classList.add('outro');
+    bgTone({freq:500,glideTo:120,dur:.45,gain:.12});
+    await wait(500);
+
+    word.classList.add('slam');sub.classList.add('slam');
+    bgTone({freq:440,dur:.5,gain:.1});
+    bgTone({freq:660,dur:.6,gain:.08,delay:.05});
+    bgTone({freq:880,dur:.7,gain:.06,delay:.1});
+
+    await wait(1200);
+    finish();
+  }
+
+  function finish(){
+    if(done)return;
+    done=true;
+    gate.classList.add('fading');
+    setTimeout(()=>{gate.classList.add('hidden');},400);
+    onDone();
+  }
+
+  function launch(){
+    if(launched)return;
+    launched=true;
+    // Runs inside the click handler → satisfies the autoplay-policy user
+    // gesture requirement, same as the existing pointerdown/keydown
+    // listeners in audio.js, just guaranteed instead of incidental.
+    AudioSys.init();
+    promptEl.style.transition='opacity .3s ease';
+    promptEl.style.opacity='0';
+    skip.style.transition='opacity .3s ease';
+    skip.style.opacity='0';
+    playSequence();
+  }
+
+  $('bootGateBtn').addEventListener('click',e=>{e.stopPropagation();launch();});
+  gate.addEventListener('click',launch);
+  skip.addEventListener('click',e=>{e.stopPropagation();if(launched)finish();});
+}
+
 /* ---------------------------------------------------------------- boot */
 function saveName(){
   const v=$('nameInput').value.trim().slice(0,14);
@@ -412,4 +538,12 @@ function wireUi(){
   }
   requestAnimationFrame(loop);
 }
-wireUi();
+
+/* Boot gate runs first on every entry point — including #join=CODE invite
+   links, which used to call wireUi() (and therefore route straight to the
+   connect screen) before any user gesture had happened. Now wireUi() is
+   the gate's completion callback, so the tap that dismisses the logo is
+   also the tap that satisfies WebAudio's autoplay policy, and the invite
+   auto-routing above still runs immediately afterward — the join flow just
+   no longer skips the loading/launch step to get there. */
+runBootGate(wireUi);
