@@ -60,6 +60,41 @@
 
 const CHANGELOG=[
   {
+    version:'1.5.0',
+    date:'2026-08-30',
+    title:'Draft System Overhaul',
+    sections:{
+      added:[
+        'Skill Evolution drafts now branch: each class ability has 2 named sub-paths (e.g. Macrophage/Taunt splits into Bulwark vs Retaliation) with their own Elite and Legendary capstone cards. Taking your first card from a path commits you to it for the rest of the run \u2014 evolutions are now a real build choice, not one fixed list.',
+        'Added new common-tier cards across every evolution tree and several new Elite/Legendary path-exclusive cards, roughly doubling total evolution content.'
+      ],
+      changed:[
+        'Draft screens (Squad, Personal, and Evolution) can no longer show empty/missing slots. If a pool genuinely runs out of new eligible cards for a player, the last slot now offers a guaranteed EP or healing reward instead of coming up blank.',
+        'Legendary drop odds reduced from 2% to 1% across all three draft pools \u2014 they were coming up too often to feel special.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'Body, Personal, and Evolution draft windows could all previously run out of eligible cards on long runs and render with fewer than 3 options. This is fixed for good \u2014 see the never-empty-slot change above.'
+      ]
+    }
+  },
+  {
+    version:'1.4.4',
+    date:'2026-08-30',
+    title:'Fixed Joystick Size & Landscape Position',
+    sections:{
+      added:[],
+      changed:[
+        'Fixed control scheme: both sticks (and their thumb caps) are noticeably bigger, making them easier to find and hold without looking.',
+        'Fixed control scheme in landscape: sticks and the ability button now sit higher, closer to a natural one-handed thumb reach, instead of riding low near the bottom edge.'
+      ],
+      nerfs:[],
+      buffs:[],
+      fixed:[]
+    }
+  },
+  {
     version:'1.4.3',
     date:'2026-08-30',
     title:'Control & Settings Fixes',

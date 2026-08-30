@@ -109,12 +109,13 @@ function maybeDamageOrgan(){
 
 /* ---------------------------------------------------------------- drafts */
 /* Rarity-weighted draw shared by all three draft pools: roll a tier per
-   slot, draw a random ELIGIBLE card of that tier (falling back a tier at a
-   time if nothing's eligible there), and never repeat a card already
+   slot, draw a random ELIGIBLE card of that tier, falling back a tier at a
+   time if nothing's eligible there, and never repeat a card already
    offered in this same draft. `pool` is the full card array, `eligibleFn`
    filters by current game state, `excludeIds` is a running set of ids
    already placed in this draft's option list (so slot 2 can't just repeat
-   slot 1). Returns null if literally nothing in the whole pool qualifies. */
+   slot 1). Returns null only if every rarity tier in `pool` is exhausted —
+   drawDraftOptions below is what guarantees the slot still gets filled. */
 function drawRarityCard(pool,eligibleFn,excludeIds){
   let tier=rollRarity();
   while(tier){
@@ -124,20 +125,75 @@ function drawRarityCard(pool,eligibleFn,excludeIds){
   }
   return null;
 }
-function drawDraftOptions(pool,eligibleFn,count){
+/* Fills every requested slot, no exceptions — a draft screen with fewer
+   cards than it advertised reads as broken, and with enough hours in a run
+   a pool WILL eventually run dry of fresh content no matter how big we make
+   it, so "the pool might not have enough" has to be handled here rather
+   than assumed away. Fallback order once the normal rarity draw comes up
+   empty (same spirit as StS/Hades-style keep-the-offer-full decks):
+     1. any remaining eligible card in the pool, ignoring rarity entirely
+        (still no duplicates within this draft)
+     2. a scaled EP/consumable filler card generated on the fly — never a
+        blank slot, and never a reoffered already-owned card standing in
+        at a discount, since that would just be a worse version of a pick
+        the player already made deliberately.
+   `fillerFactory`, if provided, is called to build filler card #2 above;
+   callers that have nothing sensible to fill with (there always will be
+   something — EP exists in every draft context) must still supply one. */
+function drawDraftOptions(pool,eligibleFn,count,fillerFactory){
   const excludeIds=new Set();
   const opts=[];
   for(let i=0;i<count;i++){
-    const card=drawRarityCard(pool,eligibleFn,excludeIds);
-    if(!card)break;
+    let card=drawRarityCard(pool,eligibleFn,excludeIds);
+    if(!card){
+      // Tier fallback exhausted — try ANY still-eligible card regardless of
+      // rarity before giving up on the pool entirely.
+      const any=pool.filter(c=>!excludeIds.has(c.id)&&eligibleFn(c));
+      card=any.length?choice(any):null;
+    }
+    if(!card&&fillerFactory){
+      // Pool is fully exhausted (every card owned/maxed/ineligible) — mint
+      // a one-off filler instead of leaving the slot blank.
+      card=fillerFactory(i,excludeIds);
+    }
+    if(!card)break; // only reachable if no fillerFactory was given at all
     excludeIds.add(card.id);
     opts.push(card.id);
   }
   return opts;
 }
+/* Filler card factories: last-resort fallback once a pool is completely
+   tapped out (every card owned/maxed/ineligible) — see drawDraftOptions.
+   Each mints a fresh id per call so it never collides with a draft's
+   excludeIds, and registers itself in FILLER_BY_ID so cost lookups
+   (scaledCost reads upg.cost/upg.rarity) and the apply path can treat it
+   like any other card without special-casing "is this a filler" at every
+   call site. Never a blank slot, never a reoffered already-owned card. */
+let fillerSeq=0;
+const FILLER_BY_ID={};
+// Squad draft spends EP, so its filler needs a cost like any UPGRADE_POOL
+// card — priced as a cheap common so it's always the safety-net option,
+// never competitive with an actual roll.
+function makeSquadFillerCard(){
+  const id='fill_sq_'+(fillerSeq++);
+  const card={id,name:'Improvised Remedy',icon:'🧫',cat:'survival',rarity:'common',cost:70,
+    desc:'Restore 120 Body HP right now',isFiller:true,oneTime:false};
+  FILLER_BY_ID[id]=card;UPG_BY_ID[id]=card;
+  return card;
+}
+// Personal/evolution drafts grant EP outright instead — there's no
+// meaningful "cost", they're always free picks.
+function makeEpFillerCard(){
+  const id='fill_ep_'+(fillerSeq++);
+  const amt=60+SIM.wave*8;
+  const card={id,name:'Reserve Nutrients',icon:'🧫',rarity:'common',
+    desc:`Grants +${amt} EP`,isFiller:true,epAmt:amt};
+  FILLER_BY_ID[id]=card;
+  return card;
+}
 function enterSquadDraft(){
   SIM.phase='squadDraft';
-  const opts=drawDraftOptions(UPGRADE_POOL,upgradeEligible,3);
+  const opts=drawDraftOptions(UPGRADE_POOL,upgradeEligible,3,makeSquadFillerCard);
   // Guarantee the squad can always afford at least the cheapest of the three
   // offered cards. Early waves (esp. wave 1) can't realistically earn enough
   // kill EP to afford anything — the draft would silently resolve to
@@ -230,6 +286,9 @@ function resolveSquadDraft(timedOut){
    filters them out of all future draws once bought. */
 function applyUpgrade(id){
   const upg=UPG_BY_ID[id];
+  // Filler cards (see makeSquadFillerCard) carry a dynamically-generated id
+  // that can't be a switch case below — handle them generically instead.
+  if(upg&&upg.isFiller){SIM.bodyHp=Math.min(SIM.bodyHpMax,SIM.bodyHp+120);return;}
   const amt=nextStackAmount(upg); // % or flat, per this specific stack
   switch(id){
     case'healBody':SIM.bodyHp=Math.min(SIM.bodyHpMax,SIM.bodyHp+200);SIM.upgrades.healBody=true;break;
@@ -280,23 +339,44 @@ function enterPersonalDrafts(){
     if(!p._ownedPerks)p._ownedPerks={};
     const pool=PERSONAL_PERK_POOL.filter(o=>!o.cls||o.cls===p.cls);
     const eligible=c=>!p._ownedPerks[c.id];
-    const opts=drawDraftOptions(pool,eligible,3);
+    const opts=drawDraftOptions(pool,eligible,3,makeEpFillerCard);
     SIM.personalDrafts[p.pid]={options:opts,picked:null};
   }
   SIM.phaseTimer=DRAFT_DURATIONS.personal;SIM.phaseDur=DRAFT_DURATIONS.personal;
   ev({k:'phase',phase:'personalDraft'});
 }
 function pickPersonal(pid,id){const d=SIM.personalDrafts[pid];if(d&&!d.picked)d.picked=id;}
+/* Evolutions are branching and class-locked (see CLASS_EVOLUTIONS in
+   data.js): each player's ability key (taunt/overdrive/heal/dash — fixed by
+   their class, never cross-class) has a small shared pool plus 2+ named
+   sub-paths. Once a player has taken any card from a branch, p._evoBranch
+   locks them to that branch for all FUTURE evolution drafts — this is the
+   deliberate "pick a path, commit to it" identity moment you'd expect from
+   the genre, whereas before there was no path choice at all, just one fixed
+   list that ran out. Before a branch is chosen, both branches' cards are
+   eligible (so the choice itself doubles as the branch pick); once locked,
+   only the shared pool + that one branch's cards are offered — the other
+   branch's cards simply never come up again for that player, same as any
+   other build-defining commitment in this genre. */
+function evolutionPoolFor(p,abKey){
+  const tree=CLASS_EVOLUTIONS[abKey];
+  if(!tree)return[];
+  const branchKeys=Object.keys(tree.branches);
+  const lockedBranch=p._evoBranch&&p._evoBranch[abKey];
+  const activeBranches=lockedBranch?[lockedBranch]:branchKeys;
+  return tree.shared.concat(activeBranches.flatMap(bk=>tree.branches[bk].cards));
+}
 function enterEvolutions(){
   SIM.phase='evolution';
   SIM.evolutions={};
   for(const p of SIM.players){
     if(!p._ownedEvos)p._ownedEvos={};
+    if(!p._evoBranch)p._evoBranch={};
     const abKey=CLASSES[p.cls].ability.key;
-    const pool=CLASS_EVOLUTIONS[abKey]||[];
+    const pool=evolutionPoolFor(p,abKey);
     const eligible=c=>!p._ownedEvos[c.id];
-    const opts=drawDraftOptions(pool,eligible,3);
-    SIM.evolutions[p.pid]={options:opts,picked:null};
+    const opts=drawDraftOptions(pool,eligible,3,makeEpFillerCard);
+    SIM.evolutions[p.pid]={options:opts,picked:null,abKey};
   }
   SIM.phaseTimer=DRAFT_DURATIONS.evolution;SIM.phaseDur=DRAFT_DURATIONS.evolution;
   ev({k:'phase',phase:'evolution'});
@@ -309,20 +389,48 @@ function allHumansPicked(map){
 function finishPersonalDrafts(timedOut){
   for(const p of SIM.players){
     const d=SIM.personalDrafts[p.pid];
-    if(d&&d.picked){applyPerk(p,d.picked);if(!p._ownedPerks)p._ownedPerks={};p._ownedPerks[d.picked]=true;}
+    if(d&&d.picked){
+      if(FILLER_BY_ID[d.picked])SIM.ep+=FILLER_BY_ID[d.picked].epAmt;
+      else{applyPerk(p,d.picked);if(!p._ownedPerks)p._ownedPerks={};p._ownedPerks[d.picked]=true;}
+    }
   }
   if(timedOut)ev({k:'say',sys:true,text:'Perk draft timed out — unpicked slots skipped',color:'#93a9b4'});
   if(SIM.wave%EVOLUTION_INTERVAL===0)enterEvolutions();
   else nextWave();
 }
+/* Which named branch (if any) a given evolution card id belongs to, for the
+   ability key it was drawn under — used to lock the player into that branch
+   the moment they take their first card from it. Shared-pool cards return
+   null (they never lock anything). */
+function branchOfCard(abKey,cardId){
+  const tree=CLASS_EVOLUTIONS[abKey];
+  if(!tree)return null;
+  for(const bKey in tree.branches){
+    if(tree.branches[bKey].cards.some(c=>c.id===cardId))return bKey;
+  }
+  return null;
+}
 function finishEvolutions(timedOut){
   for(const p of SIM.players){
     const d=SIM.evolutions[p.pid];
     if(d&&d.picked){
-      const opt=EVO_BY_ID[d.picked];
-      applyEvolution(p,opt.id);
-      if(!p._ownedEvos)p._ownedEvos={};p._ownedEvos[opt.id]=true;
-      ev({k:'evolve',name:opt.name,pid:p.pid,ability:CLASSES[p.cls].ability.name});
+      if(FILLER_BY_ID[d.picked]){
+        SIM.ep+=FILLER_BY_ID[d.picked].epAmt;
+      }else{
+        const opt=EVO_BY_ID[d.picked];
+        applyEvolution(p,opt.id);
+        if(!p._ownedEvos)p._ownedEvos={};p._ownedEvos[opt.id]=true;
+        const b=branchOfCard(d.abKey,opt.id);
+        if(b){
+          if(!p._evoBranch)p._evoBranch={};
+          if(!p._evoBranch[d.abKey]){
+            p._evoBranch[d.abKey]=b;
+            const branchName=CLASS_EVOLUTIONS[d.abKey].branches[b].name;
+            ev({k:'say',sys:true,text:`${p.name} committed to the ${branchName} path`,color:p.color});
+          }
+        }
+        ev({k:'evolve',name:opt.name,pid:p.pid,ability:CLASSES[p.cls].ability.name});
+      }
     }
   }
   if(timedOut)ev({k:'say',sys:true,text:'Evolution timed out — unpicked slots skipped',color:'#93a9b4'});

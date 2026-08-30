@@ -219,7 +219,11 @@ function renderDraftList(votesMap){
   const ep=currentView?currentView.ep:0;
   const wave=currentView?currentView.wave:1;
   optIds.forEach((id,idx)=>{
-    const meta=draftKind==='squadDraft'?UPG_BY_ID[id]:(draftKind==='personalDraft'?PERK_BY_ID[id]:EVO_BY_ID[id]);
+    // Filler cards (see makeSquadFillerCard/makeEpFillerCard in waves.js —
+    // the never-empty-slot fallback) live in FILLER_BY_ID, checked first so
+    // a dried-out pool still renders a real card instead of silently
+    // skipping the slot via the !meta guard below.
+    const meta=FILLER_BY_ID[id]||(draftKind==='squadDraft'?UPG_BY_ID[id]:(draftKind==='personalDraft'?PERK_BY_ID[id]:EVO_BY_ID[id]));
     if(!meta)return;
     const cost=draftKind==='squadDraft'?scaledCost(meta,wave):0;
     const afford=draftKind!=='squadDraft'||ep>=cost;

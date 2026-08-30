@@ -163,6 +163,13 @@ function stickOrigin(zone,base){
   }
   return null; // floating mode: caller uses the touch point itself
 }
+// Thumb half-width in px, read from the live element rather than hardcoded —
+// Fixed mode scales the thumb up via CSS (bigger --stick-base-r), so a fixed
+// "23" offset would mis-center it the moment that CSS size changes.
+function stickHalf(el){
+  const w=el.getBoundingClientRect().width;
+  return w>0?w/2:23;
+}
 joyZone.addEventListener('touchstart',e=>{
   e.preventDefault();
   const t=e.changedTouches[0];
@@ -174,7 +181,8 @@ joyZone.addEventListener('touchstart',e=>{
     joyBase.style.left=(joyCX-52)+'px';joyBase.style.top=(joyCY-52)+'px';
     joyBase.style.display='block';
   }
-  joyStick.style.left=(joyCX-23)+'px';joyStick.style.top=(joyCY-23)+'px';
+  const joyHalf=stickHalf(joyStick);
+  joyStick.style.left=(joyCX-joyHalf)+'px';joyStick.style.top=(joyCY-joyHalf)+'px';
   joyStick.style.display='block';
   joyActive=true;
 },{passive:false});
@@ -186,7 +194,8 @@ joyZone.addEventListener('touchmove',e=>{
     let dx=(t.clientX-r.left)-joyCX,dy=(t.clientY-r.top)-joyCY;
     const d=Math.hypot(dx,dy),max=52;
     if(d>max){dx=dx/d*max;dy=dy/d*max;}
-    joyStick.style.left=(joyCX+dx-23)+'px';joyStick.style.top=(joyCY+dy-23)+'px';
+    const joyHalf=stickHalf(joyStick);
+    joyStick.style.left=(joyCX+dx-joyHalf)+'px';joyStick.style.top=(joyCY+dy-joyHalf)+'px';
     // Dead zone: a resting thumb drifts a few pixels from touchdown even when
     // the player means to stand still. Below ~14% of the stick's travel,
     // that drift produced a tiny nonzero move vector every frame, which
@@ -211,7 +220,8 @@ function endJoy(e){
     if(Settings.controlScheme==='fixed'){
       // base stays put — it's a permanent fixture in Fixed mode; only the
       // thumb needs to spring back to center
-      joyStick.style.left=(joyCX-23)+'px';joyStick.style.top=(joyCY-23)+'px';
+      const joyHalf=stickHalf(joyStick);
+      joyStick.style.left=(joyCX-joyHalf)+'px';joyStick.style.top=(joyCY-joyHalf)+'px';
     }else{
       joyBase.style.display='none';joyStick.style.display='none';
     }
@@ -244,7 +254,8 @@ aimZone.addEventListener('touchstart',e=>{
     aimRing.style.left=(aimCX-AIM_RING)+'px';aimRing.style.top=(aimCY-AIM_RING)+'px';
     aimBase.style.display='block';aimRing.style.display='block';
   }
-  aimStick.style.left=(aimCX-23)+'px';aimStick.style.top=(aimCY-23)+'px';
+  const aimHalf0=stickHalf(aimStick);
+  aimStick.style.left=(aimCX-aimHalf0)+'px';aimStick.style.top=(aimCY-aimHalf0)+'px';
   aimStick.style.display='block';
   aimPastRing=false;
 },{passive:false});
@@ -260,7 +271,8 @@ aimZone.addEventListener('touchmove',e=>{
     // so aiming itself never gets more or less precise once you're past it.
     const clampD=Math.min(d,AIM_MAX);
     const nx=d>0?rawDx/d:0,ny=d>0?rawDy/d:0;
-    aimStick.style.left=(aimCX+nx*clampD-23)+'px';aimStick.style.top=(aimCY+ny*clampD-23)+'px';
+    const aimHalf=stickHalf(aimStick);
+    aimStick.style.left=(aimCX+nx*clampD-aimHalf)+'px';aimStick.style.top=(aimCY+ny*clampD-aimHalf)+'px';
     const mag=clampD/AIM_MAX;
     if(mag<AIM_DEAD){
       Input.aiming=false;
@@ -288,7 +300,8 @@ function endAim(e){
     aimTouchId=null;aimPastRing=false;
     Input.aiming=false;Input.aim={x:0,y:0};
     if(Settings.controlScheme==='fixed'){
-      aimStick.style.left=(aimCX-23)+'px';aimStick.style.top=(aimCY-23)+'px';
+      const aimHalf=stickHalf(aimStick);
+      aimStick.style.left=(aimCX-aimHalf)+'px';aimStick.style.top=(aimCY-aimHalf)+'px';
     }else{
       aimBase.style.display='none';aimStick.style.display='none';aimRing.style.display='none';
     }

@@ -120,7 +120,7 @@ const SPAWN_COST={bacteria:3,virus:5,fungi:9,worm_seg:6,toxinsac:5,mycovirus:8,m
    etc., so a slot is never wasted and early waves never dead-end reaching
    for content that isn't unlocked yet. */
 const RARITY=['common','elite','epic','legendary'];
-const RARITY_WEIGHT={common:0.60,elite:0.27,epic:0.11,legendary:0.02};
+const RARITY_WEIGHT={common:0.60,elite:0.275,epic:0.115,legendary:0.01};
 const RARITY_COLOR={common:'#b7c4cc',elite:'#5eb6ff',epic:'#c084fc',legendary:'#ffd166'};
 const RARITY_LABEL={common:'COMMON',elite:'ELITE',epic:'EPIC',legendary:'LEGENDARY'};
 function rollRarity(){
@@ -276,45 +276,145 @@ const PERSONAL_PERK_POOL=[
 const PERK_BY_ID={};PERSONAL_PERK_POOL.forEach(p=>PERK_BY_ID[p.id]=p);
 
 const EVOLUTION_INTERVAL=3;
+/* ------------------------------- evolutions (branching, per-class-locked)
+   Each ability key (taunt/overdrive/heal/dash — one per class, so this is
+   still fully class-locked, never cross-class) now has:
+     shared:   small common/elite pool anyone on that ability can draw from,
+               available before AND after a branch is chosen.
+     branches: named sub-paths (2 today, more can be appended later — the
+               system doesn't assume exactly 2) that only unlock once picked
+               and only offer their own epic/legendary capstone card to
+               players who went down that path. This replaces the old
+               single linear list — a player is no longer locked into one
+               fixed tree with a dead end at 7 cards; they pick a path
+               *shape*, not a single predetermined card order, roughly
+               doubling total content per ability. Even so, a long enough
+               run can still exhaust a branch eventually — see
+               drawDraftOptions/makeEpFillerCard in waves.js, which
+               guarantees every slot is filled regardless. */
 const CLASS_EVOLUTIONS={
-  taunt:[
-    {id:'ev_taunt_dur',name:'Prolonged Taunt',icon:'⏳',rarity:'common',desc:'Taunt duration +1.5s'},
-    {id:'ev_taunt_range',name:'Wider Broadcast',icon:'📶',rarity:'common',desc:'Taunt pull radius +60'},
-    {id:'ev_taunt_cd',name:'Faster Recovery',icon:'🔁',rarity:'common',desc:'Taunt cooldown -20%'},
-    {id:'ev_taunt_shield',name:'Protective Aggro',icon:'🛡️',rarity:'elite',desc:'Taunting grants 30% damage resistance while active'},
-    {id:'ev_taunt_thorns',name:'Reactive Membrane',icon:'🦔',rarity:'elite',desc:'Enemies taunted by you take 15% more damage'},
-    {id:'ev_taunt_double',name:'Split Signal',icon:'📡',rarity:'epic',desc:'Taunt can be re-activated once more before going on cooldown'},
-    {id:'ev_taunt_apex',name:'Absolute Aggro',icon:'👑',rarity:'legendary',desc:'While Taunt is active, you take 60% less damage and reflect 20% of it back'},
-  ],
-  overdrive:[
-    {id:'ev_od_dur',name:'Extended Focus',icon:'⏳',rarity:'common',desc:'Overdrive duration +1.5s'},
-    {id:'ev_od_cd',name:'Rapid Recovery',icon:'🔁',rarity:'common',desc:'Overdrive cooldown -25%'},
-    {id:'ev_od_ammo',name:'Efficient Cycling',icon:'🔋',rarity:'common',desc:'Overdrive no longer consumes ammo'},
-    {id:'ev_od_dmg',name:'Enzyme Surge',icon:'⚡',rarity:'elite',desc:'Overdrive also grants +20% damage while active'},
-    {id:'ev_od_pierce',name:'Overcharged Beam',icon:'🗡️',rarity:'elite',desc:'+2 pierce while Overdrive is active'},
-    {id:'ev_od_chain',name:'Resonant Cascade',icon:'🔗',rarity:'epic',desc:'While Overdrive is active, killing an enemy resets 15% of the cooldown'},
-    {id:'ev_od_apex',name:'Absolute Zero Heat',icon:'👑',rarity:'legendary',desc:'Overdrive duration doubled, and firing during it slowly heals nearby allies'},
-  ],
-  heal:[
-    {id:'ev_heal_amt',name:'Concentrated Dose',icon:'💉',rarity:'common',desc:'Heal Burst restores 50% more'},
-    {id:'ev_heal_range',name:'Broadcast Signal',icon:'📡',rarity:'common',desc:'Heal Burst range +80'},
-    {id:'ev_heal_cd',name:'Fast Synthesis',icon:'🔁',rarity:'common',desc:'Heal Burst cooldown -25%'},
-    {id:'ev_heal_cleanse',name:'Detox Pulse',icon:'🧪',rarity:'elite',desc:'Heal Burst also clears one damaged-organ debuff if any is active'},
-    {id:'ev_heal_shield',name:'Antibody Barrier',icon:'🔵',rarity:'elite',desc:'Heal Burst grants allies a temporary shield equal to 25% of the heal'},
-    {id:'ev_heal_double',name:'Dual Synthesis',icon:'✨',rarity:'epic',desc:'Heal Burst can be stored as 2 charges'},
-    {id:'ev_heal_apex',name:'Miracle Cascade',icon:'👑',rarity:'legendary',desc:'Heal Burst also fully revives one downed ally at half HP'},
-  ],
-  dash:[
-    {id:'ev_dash_dur',name:'Extended Invulnerability',icon:'⏳',rarity:'common',desc:'Dash invulnerability +0.2s'},
-    {id:'ev_dash_cd',name:'Fast Twitch',icon:'🔁',rarity:'common',desc:'Dash cooldown -25%'},
-    {id:'ev_dash_speed',name:'Explosive Burst',icon:'💨',rarity:'common',desc:'Dash travel distance +30%'},
-    {id:'ev_dash_dmg',name:'Piercing Strike',icon:'🗡️',rarity:'elite',desc:'Dashing through an enemy damages it'},
-    {id:'ev_dash_reset',name:'Kill Momentum',icon:'🔁',rarity:'elite',desc:'Killing an enemy within 1s of dashing refunds 40% of the cooldown'},
-    {id:'ev_dash_chain',name:'Blink Chain',icon:'🔗',rarity:'epic',desc:'Dash can be used twice in a row before going on cooldown'},
-    {id:'ev_dash_apex',name:'Phantom Predator',icon:'👑',rarity:'legendary',desc:'While invulnerable from Dash, your next shot after it is a guaranteed critical hit that pierces all enemies'},
-  ],
+  taunt:{
+    shared:[
+      {id:'ev_taunt_dur',name:'Prolonged Taunt',icon:'⏳',rarity:'common',desc:'Taunt duration +1.5s'},
+      {id:'ev_taunt_range',name:'Wider Broadcast',icon:'📶',rarity:'common',desc:'Taunt pull radius +60'},
+      {id:'ev_taunt_cd',name:'Faster Recovery',icon:'🔁',rarity:'common',desc:'Taunt cooldown -20%'},
+      {id:'ev_taunt_uptime',name:'Persistent Signal',icon:'📶',rarity:'common',desc:'Taunt duration +1s and cooldown -10%'},
+    ],
+    branches:{
+      bulwark:{
+        name:'Bulwark',icon:'🛡️',
+        desc:'Turn Taunt into a defensive anchor — soak more, survive more.',
+        cards:[
+          {id:'ev_taunt_shield',name:'Protective Aggro',icon:'🛡️',rarity:'elite',desc:'Taunting grants 30% damage resistance while active'},
+          {id:'ev_taunt_regen',name:'Aggro Metabolism II',icon:'💚',rarity:'elite',desc:'Regenerate 2% max HP per second while Taunt is active'},
+          {id:'ev_taunt_apex',name:'Absolute Aggro',icon:'👑',rarity:'legendary',desc:'While Taunt is active, you take 60% less damage and reflect 20% of it back'},
+        ],
+      },
+      retaliation:{
+        name:'Retaliation',icon:'🦔',
+        desc:'Turn Taunt into a punishment tool — every enemy it grabs pays for it.',
+        cards:[
+          {id:'ev_taunt_thorns',name:'Reactive Membrane',icon:'🦔',rarity:'elite',desc:'Enemies taunted by you take 15% more damage'},
+          {id:'ev_taunt_double',name:'Split Signal',icon:'📡',rarity:'elite',desc:'Taunt can be re-activated once more before going on cooldown'},
+          {id:'ev_taunt_thornsapex',name:'Perfect Storm',icon:'👑',rarity:'legendary',desc:'Enemies taunted by you take 15% more damage from the whole squad, not just you'},
+        ],
+      },
+    },
+  },
+  overdrive:{
+    shared:[
+      {id:'ev_od_dur',name:'Extended Focus',icon:'⏳',rarity:'common',desc:'Overdrive duration +1.5s'},
+      {id:'ev_od_cd',name:'Rapid Recovery',icon:'🔁',rarity:'common',desc:'Overdrive cooldown -25%'},
+      {id:'ev_od_ammo',name:'Efficient Cycling',icon:'🔋',rarity:'common',desc:'Overdrive no longer consumes ammo'},
+      {id:'ev_od_windup',name:'Fast Ignition',icon:'⚡',rarity:'common',desc:'Overdrive reaches full fire rate instantly instead of ramping up'},
+    ],
+    branches:{
+      offense:{
+        name:'Offense',icon:'⚡',
+        desc:'Overdrive hits harder while it\u2019s up.',
+        cards:[
+          {id:'ev_od_dmg',name:'Enzyme Surge',icon:'⚡',rarity:'elite',desc:'Overdrive also grants +20% damage while active'},
+          {id:'ev_od_pierce',name:'Overcharged Beam',icon:'🗡️',rarity:'elite',desc:'+2 pierce while Overdrive is active'},
+          {id:'ev_od_apex',name:'Absolute Zero Heat',icon:'👑',rarity:'legendary',desc:'Overdrive duration doubled, and firing during it slowly heals nearby allies'},
+        ],
+      },
+      sustain:{
+        name:'Sustain',icon:'🔗',
+        desc:'Overdrive keeps itself going.',
+        cards:[
+          {id:'ev_od_chain',name:'Resonant Cascade',icon:'🔗',rarity:'elite',desc:'While Overdrive is active, killing an enemy resets 15% of the cooldown'},
+          {id:'ev_od_heatvent2',name:'Deep Venting',icon:'♨️',rarity:'elite',desc:'Overdrive purges all heat on activation AND on expiry'},
+          {id:'ev_od_chainapex',name:'Endless Cycle',icon:'👑',rarity:'legendary',desc:'Every 3rd kill during Overdrive fully resets its cooldown'},
+        ],
+      },
+    },
+  },
+  heal:{
+    shared:[
+      {id:'ev_heal_amt',name:'Concentrated Dose',icon:'💉',rarity:'common',desc:'Heal Burst restores 50% more'},
+      {id:'ev_heal_range',name:'Broadcast Signal',icon:'📡',rarity:'common',desc:'Heal Burst range +80'},
+      {id:'ev_heal_cd',name:'Fast Synthesis',icon:'🔁',rarity:'common',desc:'Heal Burst cooldown -25%'},
+      {id:'ev_heal_cleanse',name:'Detox Pulse',icon:'🧪',rarity:'common',desc:'Heal Burst also clears one damaged-organ debuff if any is active'},
+    ],
+    branches:{
+      shielding:{
+        name:'Shielding',icon:'🔵',
+        desc:'Heal Burst protects as much as it repairs.',
+        cards:[
+          {id:'ev_heal_shield',name:'Antibody Barrier',icon:'🔵',rarity:'elite',desc:'Heal Burst grants allies a temporary shield equal to 25% of the heal'},
+          {id:'ev_heal_shield2',name:'Reinforced Barrier',icon:'🔵',rarity:'elite',desc:'Shields granted by Heal Burst last 3s longer and absorb 15% more'},
+          {id:'ev_heal_apex',name:'Miracle Cascade',icon:'👑',rarity:'legendary',desc:'Heal Burst also fully revives one downed ally at half HP'},
+        ],
+      },
+      overflow:{
+        name:'Overflow',icon:'✨',
+        desc:'Heal Burst becomes a resource you can spend more often, harder.',
+        cards:[
+          {id:'ev_heal_double',name:'Dual Synthesis',icon:'✨',rarity:'elite',desc:'Heal Burst can be stored as 2 charges'},
+          {id:'ev_heal_overheal2',name:'Antibody Surplus II',icon:'💫',rarity:'elite',desc:'Heal Burst overheal converts to a 20% damage buff for 8s'},
+          {id:'ev_heal_martyrapex',name:'Selfless Cascade',icon:'👑',rarity:'legendary',desc:'When Heal Burst is used, fully revive the lowest-HP downed ally if any exist'},
+        ],
+      },
+    },
+  },
+  dash:{
+    shared:[
+      {id:'ev_dash_dur',name:'Extended Invulnerability',icon:'⏳',rarity:'common',desc:'Dash invulnerability +0.2s'},
+      {id:'ev_dash_cd',name:'Fast Twitch',icon:'🔁',rarity:'common',desc:'Dash cooldown -25%'},
+      {id:'ev_dash_speed',name:'Explosive Burst',icon:'💨',rarity:'common',desc:'Dash travel distance +30%'},
+      {id:'ev_dash_windup',name:'Instant Reflex',icon:'💨',rarity:'common',desc:'Dash has no startup delay'},
+    ],
+    branches:{
+      striker:{
+        name:'Striker',icon:'🗡️',
+        desc:'Dash becomes an attack, not just a getaway.',
+        cards:[
+          {id:'ev_dash_dmg',name:'Piercing Strike',icon:'🗡️',rarity:'elite',desc:'Dashing through an enemy damages it'},
+          {id:'ev_dash_dmg2',name:'Serrated Momentum',icon:'🗡️',rarity:'elite',desc:'Dash damage +50%, and it now knocks enemies back'},
+          {id:'ev_dash_apex',name:'Phantom Predator',icon:'👑',rarity:'legendary',desc:'While invulnerable from Dash, your next shot after it is a guaranteed critical hit that pierces all enemies'},
+        ],
+      },
+      momentum:{
+        name:'Momentum',icon:'🔗',
+        desc:'Dash chains into itself the more you use it.',
+        cards:[
+          {id:'ev_dash_reset',name:'Kill Momentum',icon:'🔁',rarity:'elite',desc:'Killing an enemy within 1s of dashing refunds 40% of the cooldown'},
+          {id:'ev_dash_chain',name:'Blink Chain',icon:'🔗',rarity:'elite',desc:'Dash can be used twice in a row before going on cooldown'},
+          {id:'ev_dash_chainapex',name:'Flicker Step',icon:'👑',rarity:'legendary',desc:'Each consecutive Dash within 2s of the last is 20% stronger (damage/refund), stacking up to 3 times'},
+        ],
+      },
+    },
+  },
 };
-const EVO_BY_ID={};Object.values(CLASS_EVOLUTIONS).flat().forEach(e=>EVO_BY_ID[e.id]=e);
+/* Flat id->card lookup across shared + every branch of every ability, built
+   once at load. Adding a new branch or card to CLASS_EVOLUTIONS above is
+   automatically picked up here — nothing else needs touching. */
+const EVO_BY_ID={};
+for(const abKey in CLASS_EVOLUTIONS){
+  const tree=CLASS_EVOLUTIONS[abKey];
+  tree.shared.forEach(e=>EVO_BY_ID[e.id]=e);
+  for(const bKey in tree.branches)tree.branches[bKey].cards.forEach(e=>EVO_BY_ID[e.id]=e);
+}
 
 // squad: timeout for the shared body-draft vote — group decision, but capped
 // so one AFK/disconnected squadmate can't stall the run forever (unvoted

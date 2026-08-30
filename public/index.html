@@ -51,9 +51,9 @@
      touch, and the ability button sits locked above the aim stick with
      guaranteed clearance — this is the whole point of the scheme, so these
      tokens define exactly how much room that clearance gets. */
-  --stick-base-r:56px;      /* radius of the fixed base ring */
+  --stick-base-r:68px;      /* radius of the fixed base ring */
   --stick-travel:46px;      /* max thumb travel from base center — matches old AIM_MAX/joy max */
-  --fixed-ability-size:56px;
+  --fixed-ability-size:60px;
   --fixed-stick-gutter:18px; /* base's distance from the screen edge */
   /* Matches the Floating scheme's fire-btn bottom offset (14vh + 8vmin) so
      Fixed mode's stick centers sit at the same on-screen height as the
@@ -658,6 +658,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   transform:translate(50%,50%);
   width:calc(var(--stick-base-r) * 2);height:calc(var(--stick-base-r) * 2);
 }
+/* Thumb scales up to match the larger Fixed-mode base — otherwise it keeps
+   the Floating scheme's smaller 46px size and looks lost inside the bigger
+   ring. Sized relative to --stick-base-r so it stays proportional across
+   the landscape/portrait token overrides above. */
+#gameWrap.fixed-scheme #joyStick,
+#gameWrap.fixed-scheme #aimStick{
+  width:calc(var(--stick-base-r) * 0.82);height:calc(var(--stick-base-r) * 0.82);
+}
 /* Fixed mode drops the outer skill-trigger ring visually (the aim stick's
    travel is now a short, fixed-position hop rather than an open-ended drag,
    so a second concentric ring around it reads as clutter/confusion right
@@ -693,9 +701,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
    specifically in landscape once the portrait fix is applied. */
 @media (orientation:landscape) and (max-height:640px){
   :root{
-    --stick-base-r:48px;
-    --fixed-stick-bottom:calc(10vh + 6vmin + env(safe-area-inset-bottom));
-    --fixed-ability-size:48px;
+    --stick-base-r:60px;
+    --fixed-stick-bottom:calc(16vh + 9vmin + env(safe-area-inset-bottom));
+    --fixed-ability-size:52px;
   }
 }
 
