@@ -254,7 +254,7 @@ function runBootGate(onDone){
         diamond=$('bgDiamond'),slash=$('bgSlash'),nodeL=$('bgNodeL'),nodeR=$('bgNodeR'),
         emblem=$('bgEmblem'),glow=$('bootGateGlow'),sceneWrap=$('bootGateSceneWrap'),
         word=$('bootGateWord'),sub=$('bootGateSub'),skip=$('bootGateSkip'),
-        promptEl=$('bootGatePrompt');
+        wordBlock=$('bootGateWordBlock'),promptEl=$('bootGatePrompt');
 
   let launched=false,done=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -288,7 +288,7 @@ function runBootGate(onDone){
   }
 
   async function playSequence(){
-    await wait(300);
+    await wait(600);
 
     ring.classList.add('draw');
     bgTone({freq:180,glideTo:520,dur:.9,gain:.11,attack:.15});
@@ -340,9 +340,14 @@ function runBootGate(onDone){
 
     // Let the wordmark's own slam (.55s) + subline's delayed rise-in
     // (.3s delay + .5s duration = .8s) fully finish reading before this
-    // screen dismisses — matches how long the source file waits (11.5s
-    // total from start) before its own auto-advance would fire.
+    // screen dismisses.
     await wait(900);
+
+    // A brief gloss sweep passes over the studio name once it's settled,
+    // giving the hold some life before the whole card zooms out.
+    wordBlock.classList.add('gloss');
+    await wait(1400);
+
     finish();
   }
 
@@ -350,7 +355,7 @@ function runBootGate(onDone){
     if(done)return;
     done=true;
     gate.classList.add('fading');
-    setTimeout(()=>{gate.classList.add('hidden');},400);
+    setTimeout(()=>{gate.classList.add('hidden');},650);
     onDone();
   }
 
