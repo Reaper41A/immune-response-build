@@ -288,6 +288,8 @@ function runBootGate(onDone){
   }
 
   async function playSequence(){
+    await wait(300);
+
     ring.classList.add('draw');
     bgTone({freq:180,glideTo:520,dur:.9,gain:.11,attack:.15});
     await wait(1250);
@@ -321,19 +323,26 @@ function runBootGate(onDone){
     bgTone({freq:330,dur:.6,gain:.18,delay:.02});
     bgTone({freq:440,dur:.7,gain:.14,delay:.04});
 
-    await wait(1400);
+    // hold so the assembled mark is properly appreciated — matches the
+    // source emblem file's 2400ms hold exactly (this was 1400ms before,
+    // which is why the whole sequence felt rushed)
+    await wait(2400);
 
-    glow.classList.remove('pulse');glow.classList.add('outro');
+    glow.classList.add('outro'); // no .remove('pulse') in the source — outro's own opacity animation supersedes it
     sceneWrap.classList.add('outro');
     bgTone({freq:500,glideTo:120,dur:.45,gain:.22});
-    await wait(500);
+    await wait(600);
 
     word.classList.add('slam');sub.classList.add('slam');
     bgTone({freq:440,dur:.5,gain:.18});
     bgTone({freq:660,dur:.6,gain:.14,delay:.05});
     bgTone({freq:880,dur:.7,gain:.11,delay:.1});
 
-    await wait(1200);
+    // Let the wordmark's own slam (.55s) + subline's delayed rise-in
+    // (.3s delay + .5s duration = .8s) fully finish reading before this
+    // screen dismisses — matches how long the source file waits (11.5s
+    // total from start) before its own auto-advance would fire.
+    await wait(900);
     finish();
   }
 
@@ -362,11 +371,12 @@ function runBootGate(onDone){
       bgMaster.gain.value=0.9;
       bgMaster.connect(AudioSys.ctx.destination);
     }
-    promptEl.style.transition='opacity .3s ease';
-    promptEl.style.opacity='0';
-    promptEl.style.pointerEvents='none';
-    skip.style.transition='opacity .3s ease';
-    skip.style.opacity='0';
+    // Class-driven fade (not inline styles) so it's a single unambiguous
+    // state change — .fadeOut drops opacity AND visibility together, so
+    // the button can't visually "stick around" mid-transition or still
+    // catch taps while faded.
+    promptEl.classList.add('fadeOut');
+    skip.classList.add('fadeOut');
     playSequence();
   }
 
