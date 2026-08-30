@@ -99,7 +99,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
    rendered, just covered) reads as rising smoothly into view rather than
    a flat crossfade. */
 #bootGate.fading{
-  animation:bgGateOutro .65s cubic-bezier(.4,0,.2,1) forwards;
+  animation:bgGateOutro 1.3s cubic-bezier(.4,0,.2,1) forwards;
   pointer-events:none;
 }
 @keyframes bgGateOutro{
@@ -191,25 +191,26 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   text-shadow:0 0 22px rgba(62,232,200,.3);
   opacity:0;
   position:relative;
-  display:inline-block;
 }
-/* Gloss sweep: a soft diagonal light band drifts across just the studio
-   name's own glyphs (not the padded block around it) once while it's held
-   on screen. mix-blend-mode:overlay only brightens pixels that already
-   have content under them, so the sweep naturally clips to the letterforms
-   — including the gradient-filled "HOWTZER" — without any text-clipping
-   trickery. Fires once via the .gloss class, timed from main.js to land
-   partway through the hold. */
-#bootGateWord::before{
-  content:'';
+/* Gloss sweep: a duplicate copy of the same text, absolutely stacked on
+   top of the original and painted only through background-clip:text —
+   the highlight literally cannot exist outside the glyph shapes, so it
+   can't bleed into the padding/space around the word the way a plain
+   overlay box would. #bootGateWord's gloss and #bootGateSub's gloss are
+   triggered on a stagger from main.js (word first, then sub) so the light
+   reads as flowing from one line of text to the next rather than both
+   glowing at once. */
+.glossLayer{
   position:absolute;inset:0;
-  background:linear-gradient(75deg,transparent 40%,rgba(255,255,255,.9) 50%,transparent 60%);
+  background:linear-gradient(75deg,transparent 40%,rgba(255,255,255,.95) 50%,transparent 60%);
   background-size:300% 100%;
   background-position:150% 0;
-  mix-blend-mode:overlay;
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
   opacity:0;pointer-events:none;
 }
-#bootGateWord.gloss::before{
+#bootGateWord .glossLayer{text-shadow:none;}
+.glossLayer.sweep{
   animation:bgGlossSweep 1.1s cubic-bezier(.4,0,.2,1) forwards;
 }
 @keyframes bgGlossSweep{
@@ -223,7 +224,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bootGateWord b{font-weight:800;background:linear-gradient(135deg,var(--plasma),var(--antibody));
   -webkit-background-clip:text;background-clip:text;color:transparent;}
 #bootGateSub{margin-top:14px;font-family:var(--font-mono);font-size:clamp(9px,1.5vw,13px);
-  letter-spacing:.3em;text-transform:uppercase;color:var(--dim);opacity:0;}
+  letter-spacing:.3em;text-transform:uppercase;color:var(--dim);opacity:0;position:relative;}
 #bootGateSub.slam{animation:bgRiseIn .5s ease .3s forwards;}
 @keyframes bgRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:.85;transform:translateY(0);}}
 
@@ -931,8 +932,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
          it in flow) so it takes over the exact spot the emblem occupied once
          the emblem fades out — matches the source emblem file's wordBlock. -->
     <div id="bootGateWordBlock">
-      <div id="bootGateWord"><b>HOWTZER</b> GAMES</div>
-      <div id="bootGateSub">Studio</div>
+      <div id="bootGateWord"><b>HOWTZER</b> GAMES<span class="glossLayer" aria-hidden="true"><b>HOWTZER</b> GAMES</span></div>
+      <div id="bootGateSub">Studio<span class="glossLayer" aria-hidden="true">Studio</span></div>
     </div>
   </div>
 

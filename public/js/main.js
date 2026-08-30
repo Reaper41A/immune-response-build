@@ -343,10 +343,13 @@ function runBootGate(onDone){
     // screen dismisses.
     await wait(900);
 
-    // A brief gloss sweep passes over the studio name once it's settled,
-    // giving the hold some life before the whole card zooms out.
-    word.classList.add('gloss');
-    await wait(1400);
+    // Gloss sweeps across the wordmark first, then the subline — reads as
+    // the light flowing from one line of text down to the next, rather
+    // than both lighting up at once.
+    word.querySelector('.glossLayer').classList.add('sweep');
+    await wait(650);
+    sub.querySelector('.glossLayer').classList.add('sweep');
+    await wait(900);
 
     finish();
   }
@@ -355,7 +358,7 @@ function runBootGate(onDone){
     if(done)return;
     done=true;
     gate.classList.add('fading');
-    setTimeout(()=>{gate.classList.add('hidden');},650);
+    setTimeout(()=>{gate.classList.add('hidden');},1300);
     onDone();
   }
 
