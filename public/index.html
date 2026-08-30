@@ -143,6 +143,26 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bgEmblem.lit{animation:bgColorPulse 2.6s ease-in-out .2s infinite;}
 @keyframes bgColorPulse{0%,100%{filter:drop-shadow(0 0 10px rgba(62,232,200,.25));}50%{filter:drop-shadow(0 0 22px rgba(62,232,200,.55));}}
 
+/* Outro: emblem unwinds/implodes back out before the wordmark takes over.
+   THESE TWO RULES WERE MISSING BEFORE — the JS was adding the 'outro'
+   class but nothing consumed it, so the emblem just sat there at full
+   opacity forever instead of fading/scaling away. Ported verbatim from
+   the source emblem file. */
+#bootGateSceneWrap.outro{
+  animation:bgEmblemOutro .55s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes bgEmblemOutro{
+  0%{opacity:1;transform:scale(1) rotate(0deg);}
+  100%{opacity:0;transform:scale(.35) rotate(60deg);}
+}
+#bootGateGlow.outro{
+  animation:bgGlowOutro .4s ease-in forwards;
+}
+@keyframes bgGlowOutro{
+  0%{opacity:.4;}
+  100%{opacity:0;}
+}
+
 /* Wordmark block sits ABSOLUTELY over the same centered zone as the SVG —
    not stacked below it in normal flow — so it takes over that exact spot
    once the emblem's outro finishes fading/scaling it away. Mirrors the
@@ -169,14 +189,18 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bootGateSub.slam{animation:bgRiseIn .5s ease .3s forwards;}
 @keyframes bgRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:.85;transform:translateY(0);}}
 
-/* -------------------------------------------------- ready-to-launch prompt */
+/* -------------------------------------------------- ready-to-launch prompt
+   Once tapped, this must visibly get out of the way so the logo assembly
+   underneath reads clearly — explicit opacity+visibility transition (not
+   just opacity, and the looping pulse animation is cancelled at the same
+   time) so it can't appear to "stick around" mid-fade. */
 #bootGatePrompt{
   position:relative;margin-top:34px;display:flex;flex-direction:column;align-items:center;gap:10px;
   animation:bgPromptIn .5s ease .1s both;
+  transition:opacity .3s ease,visibility .3s ease;
 }
+#bootGatePrompt.fadeOut{opacity:0;visibility:hidden;pointer-events:none;}
 @keyframes bgPromptIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes bgPromptOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-8px) scale(.92)}}
-#bootGatePrompt.leaving{animation:bgPromptOut .35s cubic-bezier(.4,0,1,1) forwards;}
 #bootGateBtn{
   appearance:none;border:none;cursor:pointer;font-family:var(--font-ui);
   font-size:16px;font-weight:700;letter-spacing:.03em;
@@ -189,13 +213,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #bootGateBtn:hover{transform:translateY(-1px);filter:brightness(1.06);}
 #bootGateBtn:active{transform:scale(.97);}
 @keyframes bgBtnPulse{0%,100%{box-shadow:0 8px 26px -10px rgba(62,232,200,.55),inset 0 1px 0 rgba(255,255,255,.35);}50%{box-shadow:0 8px 34px -6px rgba(62,232,200,.8),inset 0 1px 0 rgba(255,255,255,.5);}}
-#bootGateHint{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);}
 
 #bootGateSkip{
   position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));
   font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
   color:rgba(255,255,255,.28);cursor:pointer;padding:8px 12px;
+  transition:opacity .3s ease,visibility .3s ease;
 }
+#bootGateSkip.fadeOut{opacity:0;visibility:hidden;pointer-events:none;}
 
 /* ------------------------------------------------------------- screens */
 .screen{
@@ -871,7 +896,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 
   <div id="bootGatePrompt">
     <button id="bootGateBtn" type="button">Ready to Launch</button>
-    <div id="bootGateHint">Tap to load audio &amp; enter Immune Response</div>
   </div>
 
   <div id="bootGateSkip">Tap anywhere to skip</div>
