@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>svgFX perf bench</title>
+<!-- svgFX.js's SPRITE_BASE is 'assets/sprites/', relative to the page URL —
+     it must resolve to public/assets/sprites/. This page lives in
+     public/perf/, so <base> repoints all page-relative fetches up one
+     level to public/, matching where index.html itself sits. Serve this
+     from an http(s) server rooted at public/ (fetch() needs http(s), not
+     file://) — e.g. `python3 -m http.server` from public/, then open
+     /perf/svgfx-bench.html. -->
+<base href="../">
+<style>
+  body{background:#0d1117;color:#c9d1d9;font-family:'Cascadia Mono',Consolas,monospace;padding:24px;max-width:760px;margin:0 auto}
+  h1{font-size:18px;font-weight:600;color:#e6edf3;margin:0 0 4px}
+  p.sub{color:#8b949e;font-size:13px;margin:0 0 20px}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+  button:hover{background:#30363d}
+  button:disabled{opacity:.4;cursor:default}
+  select,input[type=number]{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #21262d}
+  th{color:#8b949e;font-weight:500}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .warn{color:#f0883e}
+  .bad{color:#f85149}
+  .good{color:#3fb950}
+  #log{white-space:pre-wrap;font-size:12px;color:#8b949e;margin-top:16px;max-height:200px;overflow:auto;border-top:1px solid #21262d;padding-top:10px}
+  #svgLayer{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;visibility:hidden}
+  #svgLayer .svgSprite{position:absolute;left:0;top:0;pointer-events:none;transform-origin:0 0;will-change:transform}
+  #svgLayer .svgSprite svg{display:block;overflow:visible}
+  #canvas{display:none}
+</style>
+</head>
+<body>
+<h1>svgFX.sync() perf bench</h1>
+<p class="sub">
+  Loads the real production scripts (core/settings/data/audio/sim/combat/waves/flow/enemies/netcode/fx/svgFX)
+  unmodified and drives <code>SvgFX.sync()</code> against synthetic views at controlled entity counts,
+  measuring real <code>performance.now()</code> deltas and live DOM node counts under <code>#svgLayer</code>.
+  This does NOT measure GPU compositing or paint cost — only JS execution time inside sync() plus DOM
+  mutation cost as observed by the main thread. Run this in an actual browser tab, not headless.
+</p>
+
+<div class="row">
+  <label>Enemy count <input id="nEnemies" type="number" value="30" min="0" max="300" style="width:70px"></label>
+  <label>Player count <input id="nPlayers" type="number" value="4" min="0" max="8" style="width:60px"></label>
+  <label>Pickups <input id="nPickups" type="number" value="6" min="0" max="40" style="width:60px"></label>
+  <label>Turrets <input id="nTurrets" type="number" value="2" min="0" max="10" style="width:60px"></label>
+  <label>Hazards <input id="nHazards" type="number" value="3" min="0" max="20" style="width:60px"></label>
+</div>
+<div class="row">
+  <button id="runOnce">Run single sample</button>
+  <button id="runSweep">Run count sweep (5/15/30/60/100)</button>
+  <button id="runSustained">Run 300-frame sustained (checks pool churn)</button>
+  <button id="clearPool">Reset SvgFX pools</button>
+</div>
+
+<table id="results"><thead><tr>
+  <th>Scenario</th><th class="num">Entities</th><th class="num">DOM nodes</th>
+  <th class="num">sync() avg ms</th><th class="num">sync() p95 ms</th><th class="num">Verdict</th>
+</tr></thead><tbody></tbody></table>
+
+<div id="log"></div>
+
+<div id="svgLayer"></div>
+<canvas id="canvas" width="1280" height="720"></canvas>
+
+<script src="js/core.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/waves.js"></script>
+<script src="js/flow.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/netcode.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/svgFX.js"></script>
+<script src="perf/bench.js"></script>
+</body>
+</html>

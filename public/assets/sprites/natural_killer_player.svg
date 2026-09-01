@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="190" viewBox="-95 -95 190 190">
+  <defs>
+    <radialGradient id="nkGradient" cx="28%" cy="25%" r="84%">
+      <stop offset="0%" stop-color="#ead7ff"/>
+      <stop offset="52%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#65388f"/>
+    </radialGradient>
+    <radialGradient id="nkCore" cx="34%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="42%" stop-color="#ead7ff"/>
+      <stop offset="72%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#65388f"/>
+    </radialGradient>
+    <filter id="auraBlur" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="coreBlur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+
+    <style>
+      /* Natural Killer (Assassin) — fastest class, coiled/aerodynamic, always
+         reads mid-motion. Dash (special/ability): brief afterimage/streak
+         trail (motion-streaks flare hard), invulnerability shown as a fast
+         bright shimmer — same visual family as Retrovirus's cloak but
+         brighter/faster per spec. #facing-indicator rotation set inline by
+         JS from p.f. */
+      #nk{transform-origin:0 0}
+      #aura{animation:nkAura 1.6s ease-in-out infinite}
+      #motion-streaks{animation:nkStreaks 1.4s ease-in-out infinite}
+      #body{transform-box:fill-box;transform-origin:center;animation:nkBreathe 1.6s ease-in-out infinite}
+      #assassin-core{animation:nkCorePulse 1s ease-in-out infinite}
+      #dual-nub-top{animation:nkNubTop 1.8s ease-in-out infinite}
+      #dual-nub-bottom{animation:nkNubBottom 2s ease-in-out infinite .2s}
+      .damage-flash{opacity:0;pointer-events:none}
+
+      #nk.state-move #body{animation:nkBreathe .7s ease-in-out infinite}
+      #nk.state-move #motion-streaks{animation:nkStreaks .5s ease-in-out infinite}
+
+      #nk.ability-active #motion-streaks{animation:nkDashStreaks .28s ease-out}
+      #nk.ability-active #aura{animation:nkDashAura .28s ease-out}
+      #nk.ability-active #body{animation:nkDashBody .28s ease-out}
+      #nk.ability-active #assassin-core{animation:nkDashCore .28s ease-out}
+
+      #nk.state-hit #body{animation:nkHit .16s ease-out}
+      #nk.state-hit .damage-flash{animation:nkFlash .16s ease-out}
+
+      @keyframes nkAura{0%,100%{opacity:.19;transform:scale(.97)}50%{opacity:.32;transform:scale(1.05)}}
+      @keyframes nkStreaks{0%,100%{opacity:.7}50%{opacity:1}}
+      @keyframes nkBreathe{0%,100%{transform:scale(1,1) rotate(0deg)}50%{transform:scale(1.02,.98) rotate(-.6deg)}}
+      @keyframes nkCorePulse{0%,100%{opacity:.3}50%{opacity:.46}}
+      @keyframes nkNubTop{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-4deg)}}
+      @keyframes nkNubBottom{0%,100%{transform:rotate(0deg)}50%{transform:rotate(4deg)}}
+      @keyframes nkDashStreaks{0%{opacity:1;transform:scaleX(1)}100%{opacity:.3;transform:scaleX(2.2)}}
+      @keyframes nkDashAura{0%{opacity:.6;transform:scale(1.4)}100%{opacity:.15;transform:scale(1)}}
+      @keyframes nkDashBody{0%{transform:scale(.85,1.15)}100%{transform:scale(1,1)}}
+      @keyframes nkDashCore{0%{opacity:.9}100%{opacity:.3}}
+      @keyframes nkHit{0%{transform:scale(1)}35%{transform:scale(1.08,.9)}100%{transform:scale(1)}}
+      @keyframes nkFlash{0%,100%{opacity:0}22%{opacity:.85}}
+    </style>
+  </defs>
+
+  <g id="nk" transform-origin="0 0">
+
+    <!-- Fast-class aura: deliberately stretched backward like a biological afterimage -->
+    <path id="aura"
+      d="M -78,18
+         C -65,-3 -48,-24 -24,-31
+         C 3,-40 35,-28 55,-8
+         C 69,6 75,20 78,31
+         C 56,22 37,18 17,21
+         C -11,25 -38,42 -64,48
+         C -76,50 -84,39 -78,18 Z"
+      fill="#c084fc" opacity="0.22" filter="url(#auraBlur)"/>
+
+    <!-- Faint biological streaks behind the body -->
+    <g id="motion-streaks" transform-box="fill-box" transform-origin="center"
+       fill="none" stroke="#ead7ff" stroke-linecap="round">
+      <path d="M -70,33 C -52,20 -38,14 -20,10" stroke-width="3" opacity="0.24"/>
+      <path d="M -65,47 C -47,34 -30,27 -12,23" stroke-width="2" opacity="0.18"/>
+      <path d="M -57,8 C -43,1 -31,-3 -17,-5" stroke-width="2" opacity="0.16"/>
+    </g>
+
+    <!-- Coiled asymmetric assassin body -->
+    <g id="body" transform-box="fill-box" transform-origin="center">
+      <path id="body-shape"
+        d="M -39,-9
+           C -31,-29 -13,-43 7,-44
+           C 27,-45 43,-34 51,-20
+           C 60,-6 54,10 43,18
+           C 37,34 20,45 3,43
+           C -11,50 -31,39 -39,25
+           C -52,18 -53,2 -39,-9 Z"
+        fill="url(#nkGradient)"
+        stroke="#65388f" stroke-width="2.7"
+        stroke-linejoin="round"/>
+
+      <!-- Forward blade-like membrane edge -->
+      <path d="M 22,-29 C 39,-25 50,-16 55,-5 C 47,-5 39,-3 31,0 L 19,-9 Z"
+        fill="#ead7ff" opacity="0.28"/>
+
+      <!-- Visible assassin core: compact and high-energy -->
+      <g id="assassin-core" transform-box="fill-box" transform-origin="center">
+        <ellipse cx="7" cy="1" rx="18" ry="22"
+          fill="url(#nkCore)" opacity="0.34" filter="url(#coreBlur)"/>
+        <ellipse cx="7" cy="1" rx="10" ry="14"
+          fill="#ead7ff" opacity="0.32"/>
+        <path d="M -2,12 C 5,6 11,-1 14,-9 C 16,-15 14,-18 10,-21"
+          fill="none" stroke="#ffffff" stroke-width="2.4"
+          stroke-linecap="round" opacity="0.58"/>
+        <circle cx="9" cy="-7" r="4" fill="#ffffff" opacity="0.5"/>
+        <circle cx="9" cy="-7" r="1.6" fill="#ffffff" opacity="0.9"/>
+      </g>
+    </g>
+
+    <!-- Abstract paired projections echoing dual SMGs without drawing guns -->
+    <g id="dual-nubs" transform-box="fill-box" transform-origin="center">
+      <g id="dual-nub-top" transform-box="fill-box" transform-origin="right center">
+        <path d="M 30,-25 L 48,-36 L 44,-20 Z"
+          fill="#c084fc" stroke="#65388f" stroke-width="2"
+          stroke-linejoin="round"/>
+      </g>
+      <g id="dual-nub-bottom" transform-box="fill-box" transform-origin="right center">
+        <path d="M 37,17 L 56,25 L 43,31 Z"
+          fill="#c084fc" stroke="#65388f" stroke-width="2"
+          stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <!-- Direction cue -->
+    <g id="facing-indicator" transform-box="fill-box" transform-origin="left center">
+      <path d="M 45,3 L 70,3"
+        fill="none" stroke="#ead7ff" stroke-width="3.2"
+        stroke-linecap="round" opacity="0.94"/>
+      <path d="M 63,-3 L 72,3 L 63,9"
+        fill="none" stroke="#ead7ff" stroke-width="2.8"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.94"/>
+    </g>
+
+    <!-- Renderer-controlled damage flash -->
+    <path id="damage-flash"
+      d="M -39,-9
+         C -31,-29 -13,-43 7,-44
+         C 27,-45 43,-34 51,-20
+         C 60,-6 54,10 43,18
+         C 37,34 20,45 3,43
+         C -11,50 -31,39 -39,25
+         C -52,18 -53,2 -39,-9 Z"
+      fill="#ffffff" opacity="0"/>
+  </g>
+</svg>

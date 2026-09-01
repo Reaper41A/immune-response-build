@@ -18,11 +18,12 @@ function fireWeapon(sh,tx,ty){
   let rateMult=1-(SIM.upgrades._fireRatePct||0)/100;
   if(SIM.upgrades.apexMetabolism)rateMult*=1-0.15;
   if(sh._bloodlustPerk&&sh._bloodlustStacks)rateMult*=1-0.02*sh._bloodlustStacks;
+  if(sh._fireRateBonusPct)rateMult*=1-sh._fireRateBonusPct/100; // p_reload / c_p_recklessAim (curse) / p_apexReflexes
   sh.fireCd=w.rate*rateMult*(od?0.4:1);
   const odFreeAmmo=od&&sh._odNoAmmoPerk;
   if(!odFreeAmmo)sh.ammo=Math.max(0,sh.ammo-1);
   if(!od){
-    sh.heat=Math.min(1,sh.heat+w.heatPerShot*(sh._heatMod||1));
+    sh.heat=Math.min(1,sh.heat+w.heatPerShot*(sh._heatMod||1)*(1+(SIM.upgrades._heatPerShotPct||0)/100)/(sh._heatCapMult||1));
     if(sh.heat>=1){
       sh.overheated=true;sh.overheatTimer=w.overheatLock;
       ev({k:'overheat',x:sh.x,y:sh.y});
@@ -34,7 +35,7 @@ function fireWeapon(sh,tx,ty){
   const critBonus=sh._critBonus||0;
   const pierceBonus=(sh._pierceBonus||0)+(od&&sh._odPiercePerk?2:0);
   for(let i=0;i<n;i++){
-    const spr=(Math.random()-0.5)*2*w.spread+(n>1?(i-(n-1)/2)*0.09:0);
+    const spr=(Math.random()-0.5)*2*w.spread*(sh._spreadMult||1)+(n>1?(i-(n-1)/2)*0.09:0);
     const a=baseA+spr;
     SIM.projectiles.push({
       id:uid(),x:sh.x,y:sh.y,
@@ -44,7 +45,7 @@ function fireWeapon(sh,tx,ty){
       bounce:sh._bounceBonus||0,
       splash:(w.splash||0)*(sh._splashMult||1),
       ownerPid:sh.pid,life:1.4,
-      critChance:(w.critChance||0)+critBonus,knockback:w.knockback||0,
+      critChance:(w.critChance||0)+critBonus+(od&&sh._odCritBonus?sh._odCritBonus:0)+(SIM.upgrades._critChancePct||0)/100,knockback:w.knockback||0,
       hitCount:0,trail:[],
     });
   }
@@ -52,13 +53,30 @@ function fireWeapon(sh,tx,ty){
 }
 function turretFire(t,target,dmgMult){
   const a=angleTo(t.x,t.y,target.x,target.y);
+  const curseMult=(SIM.upgrades.riskyTurrets&&!t.corrupted)?1.5:1; // Unstable Turret Cores (curse)
   SIM.projectiles.push({
     id:uid(),x:t.x,y:t.y,vx:Math.cos(a)*600,vy:Math.sin(a)*600,
-    dmg:16*(dmgMult||1)*squadDamageMult(null),color:'#ffd166',
+    dmg:16*(dmgMult||1)*curseMult*squadDamageMult(null),color:'#ffd166',
     pierce:0,bounce:0,splash:0,ownerPid:-1,life:1,
     critChance:0,knockback:0,hitCount:0,trail:[],
   });
   ev({k:'shot',x:t.x,y:t.y,a,color:'#ffd166',weapon:'shot_turret'});
+}
+// Corrupted turret firing at a player or the Body core — separate from
+// turretFire above since it needs its own color/target-type handling and
+// must never read squadDamageMult (that's a squad-buff multiplier; a
+// corrupted turret is now hostile and shouldn't benefit from it).
+function corruptedTurretFire(t,targetType,target){
+  const tx=targetType==='body'?target.x:target.x;
+  const ty=targetType==='body'?target.y:target.y;
+  const a=angleTo(t.x,t.y,tx,ty);
+  SIM.projectiles.push({
+    id:uid(),x:t.x,y:t.y,vx:Math.cos(a)*560,vy:Math.sin(a)*560,
+    dmg:22,color:'#ff4d6d',
+    pierce:0,bounce:0,splash:0,ownerPid:-2,hostileTurret:true,targetType,life:1.2,
+    critChance:0,knockback:0,hitCount:0,trail:[],
+  });
+  ev({k:'shot',x:t.x,y:t.y,a,color:'#ff4d6d',weapon:'shot_turret'});
 }
 
 function damageEnemy(en,amount,opts={}){
@@ -77,9 +95,18 @@ function damageEnemy(en,amount,opts={}){
     }
   }
   if(en._tauntedDmgTakenMult)amount*=en._tauntedDmgTakenMult; // Reactive Membrane / Absolute Aggro / Phagocytic Retaliation
+  if(en._critShredT>0)amount*=1.1; // Weakening Toxin: +10% dmg taken for a few seconds after being crit
+  if(opts.shooterPid!=null&&opts.shooterPid>0){
+    const sh=SIM.players.find(p=>p.pid===opts.shooterPid);
+    if(sh&&sh._hunterInstinctPerk&&en.hp/en.hpMax<0.5)amount*=1.1;
+  }
   en.hp-=amount;
   en.hitFlash=0.15;
   ev({k:'hit',x:en.x+rand(-4,4),y:en.y-en.radius-4,crit:!!opts.crit,amt:Math.round(amount)});
+  if(opts.crit&&opts.shooterPid!=null){
+    const sh=opts.shooterPid>0?SIM.players.find(p=>p.pid===opts.shooterPid):null;
+    if(sh&&sh._critShredPerk)en._critShredT=3;
+  }
   if(en.hp<=0)killEnemy(en,opts);
 }
 function killEnemy(en,opts={}){
@@ -93,11 +120,13 @@ function killEnemy(en,opts={}){
     sh.kills++;
     if(sh._lifestealFlat)sh.hp=Math.min(sh.hpMax,sh.hp+sh._lifestealFlat);
     if(en.el&&SIM.upgrades.bloodhoundEP)SIM.ep+=Math.round(gained*0.35);
+    if(sh._personalEpPct)SIM.ep+=Math.round(gained*sh._personalEpPct); // Omnivorous Metabolism / Gluttonous Hunger (curse)
     if(sh._bloodlustPerk){sh._bloodlustStacks=Math.min(5,(sh._bloodlustStacks||0)+1);sh._bloodlustTimer=4;}
     if(sh._dashResetPerk&&sh._justDashedTimer>0)sh.abilityCd=Math.max(0,sh.abilityCd-CLASSES[sh.cls].ability.cd*0.4);
     if(sh._odChainPerk&&sh.abilityActive>0)sh.abilityCd=Math.max(0,sh.abilityCd-CLASSES[sh.cls].ability.cd*0.15);
+    if(sh._odExtendPerk&&sh.abilityActive>0&&CLASSES[sh.cls].ability.key==='overdrive')sh.abilityActive+=0.4;
   }
-  ev({k:'die',x:en.x,y:en.y,color:en.color,scale:en.isBoss?2.2:1,boss:en.isBoss,ep:gained,name:en.name});
+  ev({k:'die',x:en.x,y:en.y,color:en.color,scale:en.isBoss?2.2:1,boss:en.isBoss,ep:gained,name:en.name,d:en.defKey});
   trySpawnPickup(en);
   if(en.defKey==='fungi'&&mutFlags(SIM.wave).fungiSpores){for(let i=0;i<2;i++)spawnSpore(en);}
   if(en.defKey==='mycovirus')spawnSpore(en);
@@ -136,12 +165,51 @@ function trySpawnPickup(en){
 }
 function damagePlayer(p,amount,src){
   if(!p.alive||p.invuln>0)return;
-  if(p._tauntShield)amount*=p._tauntApexPerk?0.4:0.7; // Absolute Aggro (legendary) improves the base Protective Aggro reduction
+  if(p._tauntShield)amount*=p._tauntApexPerk?0.4:(p._tauntFortressCurse?0.6:0.7); // Absolute Aggro (legendary) / Fortress Instinct (curse) improve the base Protective Aggro reduction
   if(SIM.upgrades._dmgReducedPct)amount*=1-SIM.upgrades._dmgReducedPct/100; // Thickened Membrane (squad-wide, stacks)
-  if(p._healShield>0){const abs=Math.min(p._healShield,amount);p._healShield-=abs;amount-=abs;}
+  if(p._dmgTakenMult)amount*=p._dmgTakenMult; // Ironhide Plating / Fragile Focus (curse) — personal damage-taken modifier
+  if(p._odAddictionCurse&&p.abilityCd>0&&CLASSES[p.cls].ability.key==='overdrive')amount*=1.15; // Enzyme Addiction (curse): vulnerable while OD is down
+  if(p._healShield>0){
+    if(p._healShieldBrittle&&amount>=p._healShield){
+      // Brittle Ward (curse): no partial absorb — a hit that would break the
+      // shield gets NONE of the reduction, the shield just shatters.
+      p._healShield=0;
+    }else{
+      const abs=Math.min(p._healShield,amount);
+      p._healShield-=abs;amount-=abs;
+    }
+  }
   if(amount<=0)return;
+  // Membrane Rebound / Absolute Aggro: reflect a % of taken damage back at
+  // the attacking enemy while Taunt is active — only possible when src is
+  // an actual enemy object (contact damage), not a generic hazard/turret
+  // source string, since there's nothing sensible to reflect onto otherwise.
+  if(p.abilityActive>0&&CLASSES[p.cls].ability.key==='taunt'&&src&&typeof src==='object'&&src.alive&&(p._tauntReflectPerk||p._tauntApexPerk)){
+    const pct=p._tauntApexPerk?0.2:0.1;
+    damageEnemy(src,amount*pct,{shooterPid:p.pid});
+  }
   p.hp-=amount;
   if(p.hp<=0){
+    // Phoenix Protocol (legendary, squad): the first squadmate to go down
+    // each wave is instantly revived at 50% HP instead of actually going
+    // down — a one-charge-per-wave safety net, not a permanent immunity.
+    if(SIM.upgrades.phoenixProtocol&&!SIM.phoenixUsedThisWave){
+      SIM.phoenixUsedThisWave=true;
+      p.hp=Math.round(p.hpMax*0.5);
+      p.invuln=1.0;
+      ev({k:'say',sys:true,text:`${p.name} saved by Phoenix Protocol!`,color:'#ffd166'});
+      return;
+    }
+    // Dormant Spore (epic, personal): one-charge-per-run — survive the
+    // first down at 1 HP instead. Separate flag/charge from Phoenix
+    // Protocol above so the two don't cannibalize each other's save.
+    if(p._secondChancePerk&&!p._secondChanceUsed){
+      p._secondChanceUsed=true;
+      p.hp=1;
+      p.invuln=1.0;
+      ev({k:'say',sys:true,text:`${p.name} survives on a Dormant Spore!`,color:'#ffd166'});
+      return;
+    }
     p.alive=false;p.hp=0;p.respawnTimer=RESPAWN_SECONDS;p.inFiring=false;
     onFireReleased(p);
     ev({k:'down',x:p.x,y:p.y,color:p.color,pid:p.pid,name:p.name});
@@ -168,16 +236,28 @@ function useAbility(p){
       if(!en.alive||en.isBoss)continue;
       if(dist2(p.x,p.y,en.x,en.y)<range*range){
         en.tauntedBy=p.pid;
-        if(p._tauntThornsPerk||p._tauntApexPerk||p._retaliatePerk)en._tauntedDmgTakenMult=p._tauntApexPerk?1.2:1.15;
+        if(p._tauntThornsPerk||p._tauntApexPerk||p._retaliatePerk){
+          en._tauntedDmgTakenMult=p._tauntApexPerk?1.2:(p._tauntProvokeCurse?1.3:1.15);
+        }
       }
     }
-    if(p._tauntShieldPerk||p._tauntApexPerk)p._tauntShield=true;
+    // Provoke Overload (curse): trades away the shield/resist entirely for
+    // bigger taunted-target damage — so it deliberately does NOT set
+    // p._tauntShield even though it shares the shield-granting perk check.
+    if((p._tauntShieldPerk||p._tauntApexPerk)&&!p._tauntProvokeCurse)p._tauntShield=true;
     ev({k:'taunt',x:p.x,y:p.y});
   }else if(ab.key==='overdrive'){
     if(p._odDmgPerk)p._overdriveDmg=true;
-    if(p._heatVentPerk)p.heat=0;
+    if(p._heatVentPerk||p._odInstantVentPerk){p.heat=0;p.overheated=false;p.overheatTimer=0;}
     ev({k:'overdrive',x:p.x,y:p.y});
   }else if(ab.key==='heal'){
+    // Metabolic Burnout (curse): every Heal Burst costs the caster 5% of
+    // their own max HP — charged BEFORE the heal amounts below so a caster
+    // can't heal past the self-cost they just paid in the same cast.
+    if(p._healBurnoutCurse){
+      const selfCost=Math.round(p.hpMax*0.05);
+      p.hp=Math.max(1,p.hp-selfCost); // never lets Heal Burst itself down the caster
+    }
     const healMult=p._healMult||1;
     const amt=60*healMult;
     const pAmt=40*healMult;
@@ -197,10 +277,12 @@ function useAbility(p){
     }
     for(const pl of SIM.players){
       if(pl.alive&&dist2(p.x,p.y,pl.x,pl.y)<range*range){
+        if(pl._noHealPerk)continue; // Martyr's Bargain (curse): can't be healed by allies
+        const selfMult=(pl===p&&p._healSelfBonus)?1+p._healSelfBonus:1;
         const room=pl.hpMax-pl.hp;
-        const h=Math.min(room,pAmt);
+        const h=Math.min(room,pAmt*selfMult);
         pl.hp+=h;
-        if(p._healShieldPerk||p._healShieldEvoPerk)pl._healShield=(pl._healShield||0)+(p._healShieldEvoPerk?pAmt*0.25:20);
+        if(p._healShieldPerk||p._healShieldEvoPerk)pl._healShield=(pl._healShield||0)+(p._healShieldEvoPerk?pAmt*0.25*(p._shieldAmtMult||1):20);
         // Antibody Surplus (epic): heal that would've overflowed max HP
         // becomes a temporary squad damage buff instead of being wasted.
         if(p._overhealPerk&&pAmt>room)pl._overhealDmgBuff=6;
@@ -216,20 +298,36 @@ function useAbility(p){
     const a=p.facing;
     const dashSpeed=720*(p._dashSpeedMult||1);
     p.dashVX=Math.cos(a)*dashSpeed;p.dashVY=Math.sin(a)*dashSpeed;
-    p.invuln=(ab.duration)+(p._durBonus||0)+0.15;
+    // Berserker's Edge (curse): trades away Dash's invulnerability window
+    // entirely for a straight damage buff — checked here rather than after
+    // the fact, since granting-then-immediately-stripping invuln could
+    // still race against a same-frame hit.
+    if(!p._dashBerserkCurse)p.invuln=(ab.duration)+(p._durBonus||0)+0.15+(p._dashPreInvulnPerk?0.15:0);
+    if(p._dashOverextendCurse)p.ammo=Math.max(0,p.ammo-4);
     if(p._dashDmgPerk)p._dashDmg=true;
     // Ambush Predator (elite): next shot after a dash crits. Phantom
     // Predator (legendary) upgrades that same window to also pierce all.
     if(p._dashCritPerk||p._dashApexPerk)p._dashCritWindow=1.2;
     if(p._dashApexPerk)p._dashApexWindow=1.2;
     p._justDashedTimer=1;
+    if(p._dashAmmoRefund)p.ammo=Math.min(p.ammoMax,p.ammo+p._dashAmmoRefund);
+    if(p._dashMomentumPerk){
+      const cur=p._dashMomentumStacks||0;
+      if(cur<3){p.speed*=1.04;p._dashMomentumStacks=cur+1;}
+      p._dashMomentumTimer=3;
+    }
     ev({k:'dash',x:p.x,y:p.y});
   }
 }
 function onAbilityEnd(p){
   const key=CLASSES[p.cls].ability.key;
   if(key==='taunt'){for(const en of SIM.enemies)if(en.tauntedBy===p.pid)en.tauntedBy=0;p._tauntShield=false;}
-  if(key==='overdrive')p._overdriveDmg=false;
+  if(key==='overdrive'){
+    p._overdriveDmg=false;
+    // Reactor Meltdown (curse): the damage boost comes at the cost of a
+    // forced overheat the instant Overdrive ends.
+    if(p._odMeltdownCurse){p.heat=1;p.overheated=true;p.overheatTimer=2;ev({k:'overheat',x:p.x,y:p.y});}
+  }
   if(key==='dash')p._dashDmg=false;
 }
 
@@ -252,6 +350,26 @@ function tickPlayerPerks(p,dt){
   }
   if(p._justDashedTimer>0)p._justDashedTimer-=dt;
   if(p._dashCritWindow>0)p._dashCritWindow-=dt;
+  if(p._followupCritWindow>0)p._followupCritWindow-=dt;
+  // Building Momentum: +4% move speed per stack (max 3) for 3s after each
+  // Dash. Applied/removed only on stack-count CHANGE (same drift-safe
+  // pattern as Predatory Stealth below) since p.speed is shared and
+  // repeatedly multiplied elsewhere.
+  if(p._dashMomentumPerk){
+    if(p._dashMomentumTimer>0){
+      p._dashMomentumTimer-=dt;
+      if(p._dashMomentumTimer<=0){p.speed/=1+0.04*(p._dashMomentumStacks||0);p._dashMomentumStacks=0;}
+    }
+  }
+  // Predatory Stealth: +8% move speed above 70% HP. Applied/removed only on
+  // the threshold CROSSING (not every frame) since p.speed is a shared,
+  // repeatedly-multiplied field other perks also write to — toggling a %
+  // in and out every tick would drift from double-application.
+  if(p._stealthSpeedPerk){
+    const above=p.hp/p.hpMax>0.7;
+    if(above&&!p._stealthActive){p.speed*=1.08;p._stealthActive=true;}
+    else if(!above&&p._stealthActive){p.speed/=1.08;p._stealthActive=false;}
+  }
   if(p._dashApexWindow>0)p._dashApexWindow-=dt;
   if(p._overhealDmgBuff>0)p._overhealDmgBuff-=dt;
 }

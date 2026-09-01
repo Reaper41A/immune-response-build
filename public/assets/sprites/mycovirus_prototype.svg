@@ -1,0 +1,271 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="150" height="150"
+     viewBox="-75 -75 150 150">
+
+  <defs>
+    <!-- Mycovirus: pink hybrid palette, rounded capsid with organic fungal protrusions. -->
+    <radialGradient id="mycovirusCapsidGradient" cx="35%" cy="30%" r="75%">
+      <stop offset="0%"   stop-color="#ffd6ef"/>
+      <stop offset="44%"  stop-color="#ff8ecf"/>
+      <stop offset="76%"  stop-color="#c9629d"/>
+      <stop offset="100%" stop-color="#8f4570"/>
+    </radialGradient>
+
+    <radialGradient id="mycovirusBudGradient" cx="34%" cy="28%" r="76%">
+      <stop offset="0%"   stop-color="#ffe4f4"/>
+      <stop offset="45%"  stop-color="#ff9bd3"/>
+      <stop offset="78%"  stop-color="#c9629d"/>
+      <stop offset="100%" stop-color="#8f4570"/>
+    </radialGradient>
+
+    <radialGradient id="mycovirusCoreGradient" cx="35%" cy="30%" r="70%">
+      <stop offset="0%"   stop-color="#fff0fa"/>
+      <stop offset="52%"  stop-color="#ffd6ef"/>
+      <stop offset="100%" stop-color="#ff8ecf"/>
+    </radialGradient>
+
+    <filter id="auraBlur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+
+    <filter id="coreGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+
+    <filter id="softGloss" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="1.2"/>
+    </filter>
+
+    <!-- Full hybrid silhouette used by the renderer's synchronized hit flash. -->
+    <path id="mycovirus-outline"
+      d="M -35,-8
+         C -38,-20 -31,-32 -20,-36
+         C -13,-46 -1,-49 8,-43
+         C 17,-47 29,-41 31,-31
+         C 43,-28 48,-17 43,-8
+         C 49,1 44,13 34,16
+         C 32,28 21,35 10,31
+         C 2,41 -12,39 -17,30
+         C -28,33 -38,25 -36,15
+         C -47,12 -48,0 -40,-6
+         C -39,-7 -37,-8 -35,-8 Z"/>
+
+    <style>
+      /* Mycovirus — hybrid: virus-like erratic movement + fungal spore-shed
+         buds. Idle/move echo Virus's erratic wobble language; critical
+         reuses Fungi's "buds swell" behavior since it shares that mechanic.
+         Death: buds detach and scatter, smaller/faster than Fungi's shed.
+         No attack state. */
+      #mycovirus{transform-origin:0 0}
+      #aura{animation:mycoAura 1.6s ease-in-out infinite}
+      #capsid{transform-box:fill-box;transform-origin:center;animation:mycoBreathe 1.7s ease-in-out infinite}
+      #bud-1{animation:mycoBud1 2.1s ease-in-out infinite}
+      #bud-2{animation:mycoBud2 2.4s ease-in-out infinite .3s}
+      #bud-3{animation:mycoBud3 1.9s ease-in-out infinite .6s}
+      #core{transform-box:fill-box;transform-origin:center;animation:mycoCorePulse 1.1s ease-in-out infinite}
+      #core-glow{animation:mycoGlowPulse 1.1s ease-in-out infinite}
+      #surface-flecks{animation:mycoFlecks 3s ease-in-out infinite}
+      .damage-flash{opacity:0;pointer-events:none}
+
+      #mycovirus.state-move #capsid{animation:mycoErraticWobble .8s ease-in-out infinite}
+
+      #mycovirus.state-hit #capsid{animation:mycoHit .2s ease-out}
+      #mycovirus.state-hit #core{animation:mycoCoreHit .2s ease-out}
+      #mycovirus.state-hit .damage-flash{animation:mycoFlash .2s ease-out}
+
+      #mycovirus.state-critical #bud-1,#mycovirus.state-critical #bud-2,#mycovirus.state-critical #bud-3{animation:mycoBudSwell 1s ease-in-out infinite}
+      #mycovirus.state-critical #capsid{animation:mycoCriticalBreathe .5s ease-in-out infinite}
+
+      #mycovirus.state-death #capsid{animation:mycoDeathBody .55s ease-in forwards}
+      #mycovirus.state-death #bud-1{animation:mycoBudScatter1 .5s ease-in forwards}
+      #mycovirus.state-death #bud-2{animation:mycoBudScatter2 .5s ease-in forwards .04s}
+      #mycovirus.state-death #bud-3{animation:mycoBudScatter3 .5s ease-in forwards .08s}
+      #mycovirus.state-death #core{animation:mycoCoreEscape .5s ease-in forwards}
+      #mycovirus.state-death #aura,
+      #mycovirus.state-death #surface-flecks{animation:mycoFadeOut .35s ease-out forwards}
+
+      @keyframes mycoAura{0%,100%{opacity:.18;transform:scale(.94)}50%{opacity:.34;transform:scale(1.08)}}
+      @keyframes mycoBreathe{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.03,.97) rotate(1.2deg)}}
+      @keyframes mycoErraticWobble{0%,100%{transform:rotate(0deg) translate(0,0)}25%{transform:rotate(-3deg) translate(-1px,.5px)}60%{transform:rotate(2.5deg) translate(1px,-.5px)}}
+      @keyframes mycoBud1{0%,100%{transform:scale(1) translate(0,0)}50%{transform:scale(1.06) translate(-.5px,-.7px)}}
+      @keyframes mycoBud2{0%,100%{transform:scale(1) translate(0,0)}50%{transform:scale(1.05) translate(.6px,-.5px)}}
+      @keyframes mycoBud3{0%,100%{transform:scale(1) translate(0,0)}50%{transform:scale(1.07) translate(.4px,.5px)}}
+      @keyframes mycoCorePulse{0%,100%{transform:scale(.9)}50%{transform:scale(1.15)}}
+      @keyframes mycoGlowPulse{0%,100%{opacity:.6}50%{opacity:1}}
+      @keyframes mycoFlecks{0%,100%{opacity:.6}50%{opacity:1}}
+      @keyframes mycoHit{0%{transform:scale(1)}35%{transform:translate(2px,-1px) scale(1.1,.88)}100%{transform:scale(1)}}
+      @keyframes mycoCoreHit{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
+      @keyframes mycoFlash{0%,100%{opacity:0}22%{opacity:.9}}
+      @keyframes mycoBudSwell{0%,100%{transform:scale(1)}50%{transform:scale(1.28)}}
+      @keyframes mycoCriticalBreathe{0%,100%{transform:scale(1,.97)}50%{transform:scale(1.05,1.02)}}
+      @keyframes mycoDeathBody{0%{transform:scale(1);opacity:1}55%{transform:scale(1.14,.8) rotate(10deg);opacity:1}100%{transform:scale(.1) rotate(40deg);opacity:0}}
+      @keyframes mycoBudScatter1{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(-16px,-14px) scale(.4);opacity:0}}
+      @keyframes mycoBudScatter2{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(15px,-16px) scale(.4);opacity:0}}
+      @keyframes mycoBudScatter3{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(14px,14px) scale(.4);opacity:0}}
+      @keyframes mycoCoreEscape{0%{transform:scale(1);opacity:1}100%{transform:translate(10px,-8px) scale(.3);opacity:0}}
+      @keyframes mycoFadeOut{0%{opacity:1}100%{opacity:0}}
+    </style>
+  </defs>
+
+  <!-- Root: JS translates this and applies idle/move/hit/critical/death classes. -->
+  <g id="mycovirus" transform-origin="0 0">
+
+    <!-- Soft pink aura behind the hybrid organism. -->
+    <g id="aura" transform-box="fill-box" transform-origin="center">
+      <use href="#mycovirus-outline"
+           fill="#ffd6ef" opacity=".20"
+           transform="scale(1.12)"
+           filter="url(#auraBlur)"/>
+    </g>
+
+    <!-- Main capsid: round like Virus, but subtly organic/asymmetric. -->
+    <g id="capsid" transform-box="fill-box" transform-origin="center">
+
+      <path id="capsid-shape"
+        d="M -35,-8
+           C -38,-20 -31,-32 -20,-36
+           C -13,-46 -1,-49 8,-43
+           C 17,-47 29,-41 31,-31
+           C 43,-28 48,-17 43,-8
+           C 49,1 44,13 34,16
+           C 32,28 21,35 10,31
+           C 2,41 -12,39 -17,30
+           C -28,33 -38,25 -36,15
+           C -47,12 -48,0 -40,-6
+           C -39,-7 -37,-8 -35,-8 Z"
+        fill="url(#mycovirusCapsidGradient)"/>
+
+      <!-- Lower-right depth: keeps the body spherical without adding rigid geometry. -->
+      <path
+        d="M -36,8
+           C -32,24 -19,34 -5,35
+           C 10,37 25,30 33,17
+           C 40,7 43,-4 39,-13
+           C 43,0 35,14 24,20
+           C 13,27 0,29 -12,25
+           C -23,22 -31,16 -36,8 Z"
+        fill="#8f4570" opacity=".15"/>
+
+      <!-- Broad upper-left capsid highlight. -->
+      <path id="capsid-highlight"
+        d="M -28,-25
+           C -21,-37 -8,-43 4,-40
+           C 14,-38 21,-33 26,-26
+           C 15,-30 5,-29 -4,-25
+           C -13,-21 -20,-15 -25,-8
+           C -29,-13 -31,-20 -28,-25 Z"
+        fill="#ffd6ef" opacity=".38"/>
+
+      <ellipse cx="-8" cy="-34" rx="6.2" ry="2.2"
+               fill="#ffffff" opacity=".38"
+               filter="url(#softGloss)"/>
+
+      <!-- Minimal capsid contour, giving it a biological membrane feel. -->
+      <path
+        d="M -28,-15
+           C -23,-29 -10,-37 4,-37
+           C 18,-37 29,-29 35,-18"
+        fill="none"
+        stroke="#ffd6ef"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        opacity=".26"/>
+    </g>
+
+    <!-- Three small fungal buds: deliberately fewer and smaller than Fungi's cap-bumps. -->
+    <g id="hybrid-buds" transform-box="fill-box" transform-origin="center">
+
+      <g id="bud-1" transform-box="fill-box" transform-origin="center">
+        <!-- upper-left bud -->
+        <path
+          d="M -23,-30
+             C -28,-35 -27,-43 -22,-46
+             C -17,-49 -11,-46 -10,-41
+             C -9,-36 -13,-31 -18,-29
+             C -20,-28 -22,-29 -23,-30 Z"
+          fill="url(#mycovirusBudGradient)"/>
+        <path
+          d="M -24,-39 C -21,-45 -15,-46 -12,-42
+             C -17,-42 -20,-39 -22,-35 Z"
+          fill="#ffd6ef" opacity=".36"/>
+        <ellipse cx="-19" cy="-43" rx="2.4" ry="1"
+                 fill="#ffffff" opacity=".30" filter="url(#softGloss)"/>
+      </g>
+
+      <g id="bud-2" transform-box="fill-box" transform-origin="center">
+        <!-- upper-right bud -->
+        <path
+          d="M 18,-31
+             C 19,-38 24,-42 30,-40
+             C 36,-38 38,-32 35,-27
+             C 32,-22 25,-21 20,-24
+             C 18,-26 17,-28 18,-31 Z"
+          fill="url(#mycovirusBudGradient)"/>
+        <path
+          d="M 21,-34 C 24,-39 30,-40 34,-36
+             C 29,-36 25,-33 22,-29 Z"
+          fill="#ffd6ef" opacity=".34"/>
+        <ellipse cx="29" cy="-37" rx="2.3" ry="1"
+                 fill="#ffffff" opacity=".30" filter="url(#softGloss)"/>
+      </g>
+
+      <g id="bud-3" transform-box="fill-box" transform-origin="center">
+        <!-- lower-right bud: slightly lower and more bulbous to keep the silhouette asymmetrical -->
+        <path
+          d="M 28,12
+             C 34,9 40,12 42,17
+             C 45,23 41,29 35,30
+             C 29,31 24,27 24,22
+             C 24,17 25,14 28,12 Z"
+          fill="url(#mycovirusBudGradient)"/>
+        <path
+          d="M 28,17 C 31,12 37,13 40,17
+             C 35,16 31,19 28,23 Z"
+          fill="#ffd6ef" opacity=".32"/>
+        <ellipse cx="35" cy="16" rx="2.2" ry=".95"
+                 fill="#ffffff" opacity=".28" filter="url(#softGloss)"/>
+      </g>
+
+    </g>
+
+    <!-- Simple interior: one small core, intentionally less elaborate than Virus's genome strand. -->
+    <g id="interior" transform-box="fill-box" transform-origin="center">
+      <ellipse id="core-glow"
+               cx="1" cy="-1" rx="9" ry="8"
+               fill="#ffd6ef" opacity=".16"
+               filter="url(#coreGlow)"/>
+
+      <ellipse id="core"
+               cx="1" cy="-1" rx="5.2" ry="4.6"
+               fill="url(#mycovirusCoreGradient)"/>
+
+      <ellipse cx="-1" cy="-3" rx="2.2" ry="1.1"
+               fill="#ffffff" opacity=".42"
+               filter="url(#softGloss)"/>
+    </g>
+
+    <!-- Tiny membrane flecks reinforce the hybrid's organic surface without over-detailing it. -->
+    <g id="surface-flecks" fill="#ffd6ef" opacity=".34">
+      <ellipse cx="-29" cy="1" rx="2.1" ry="1"/>
+      <ellipse cx="28" cy="-13" rx="1.9" ry=".9"/>
+      <ellipse cx="-10" cy="24" rx="1.8" ry=".9"/>
+    </g>
+
+    <!-- Full silhouette hit flash; JS controls only this group's opacity. -->
+    <g id="damage-flash" opacity="0" pointer-events="none">
+      <use href="#mycovirus-outline" fill="#ffffff"/>
+
+      <!-- Buds included so the flash covers the complete hybrid silhouette. -->
+      <path d="M -23,-30 C -28,-35 -27,-43 -22,-46 C -17,-49 -11,-46 -10,-41
+               C -9,-36 -13,-31 -18,-29 C -20,-28 -22,-29 -23,-30 Z"
+            fill="#ffffff"/>
+      <path d="M 18,-31 C 19,-38 24,-42 30,-40 C 36,-38 38,-32 35,-27
+               C 32,-22 25,-21 20,-24 C 18,-26 17,-28 18,-31 Z"
+            fill="#ffffff"/>
+      <path d="M 28,12 C 34,9 40,12 42,17 C 45,23 41,29 35,30
+               C 29,31 24,27 24,22 C 24,17 25,14 28,12 Z"
+            fill="#ffffff"/>
+    </g>
+
+  </g>
+</svg>

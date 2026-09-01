@@ -229,10 +229,16 @@ function renderDraftList(votesMap){
     const afford=draftKind!=='squadDraft'||ep>=cost;
     const card=document.createElement('div');
     const rarity=meta.rarity||'common';
+    // Curses get their own accent color/badge (CURSE_COLOR/CURSE_LABEL,
+    // keyed by curseTier) instead of the normal rarity treatment — they're
+    // a distinct 5th tier visually, not just an elite/epic card with a
+    // scary name, so the risk/reward choice is obvious before clicking.
+    const isCurse=!!meta.curse;
+    const accentColor=isCurse?CURSE_COLOR[meta.curseTier||'mild']:RARITY_COLOR[rarity];
     // Rarity now drives the card's accent color/glow (legendary=gold pops
     // hardest); category is still shown as a small text tag on squad cards.
-    card.className='upgrade-card rarity-'+rarity+(draftSelId===id?' picked':'')+(afford?'':' disabled');
-    card.style.setProperty('--oc',RARITY_COLOR[rarity]);
+    card.className='upgrade-card rarity-'+rarity+(isCurse?' cursed curse-'+(meta.curseTier||'mild'):'')+(draftSelId===id?' picked':'')+(afford?'':' disabled');
+    card.style.setProperty('--oc',accentColor);
     const costHtml=draftKind==='squadDraft'
       ?(afford?`<div class="upgrade-cost">◈${cost}</div>`:`<div class="upgrade-cost cant">NEED ◈${cost}</div>`)
       :'';
@@ -255,7 +261,9 @@ function renderDraftList(votesMap){
       const n=upgStacks(meta.id);
       desc=desc.replace('{amt}',amt)+` <span class="stack-count">(${n+1}/${meta.stack.max})</span>`;
     }
-    const rarityBadge=`<span class="rarity-badge" style="color:${RARITY_COLOR[rarity]}">${RARITY_LABEL[rarity]}</span>`;
+    const rarityBadge=isCurse
+      ?`<span class="rarity-badge cursed" style="color:${accentColor}">💀 ${CURSE_LABEL[meta.curseTier||'mild']}</span>`
+      :`<span class="rarity-badge" style="color:${accentColor}">${RARITY_LABEL[rarity]}</span>`;
     card.innerHTML=`<div class="num-key">${idx+1}</div><div class="upgrade-icon">${meta.icon}</div>`+
       `<div class="upgrade-body"><div class="upgrade-name">${meta.name} ${rarityBadge}</div><div class="upgrade-desc">${desc}${meta.cat?` · <span style="color:${CAT_COLOR[meta.cat]}">${meta.cat}</span>`:''}</div></div>`+
       costHtml+votesHtml;
@@ -346,6 +354,7 @@ function applyGuestAction(pid,d){
 function showResults(stats,reason){
   if(App.screen==='results')return; // host event + relay can both arrive
   App.inRun=false;
+  if(typeof SvgFX!=='undefined')SvgFX.reset(); // clear pooled sprite DOM nodes now that the run is over
   showScreen('screenResults');
   $('resultsTitle').textContent='THE BODY HAS FALLEN';
   $('resultsSub').textContent='Failed at wave '+stats.waves+' — infection overwhelmed the body';
@@ -367,6 +376,7 @@ function leaveToMenu(){
   exitGameFullscreen(); // covers every path here: quit, kick, disconnect, host-ended
   App.leaving=true; // suppress auto-reconnect — this exit was intentional
   App.inRun=false;App.mode=null;App.isHost=false;SIM=null;
+  if(typeof SvgFX!=='undefined')SvgFX.reset(); // clear pooled sprite DOM nodes so a fresh run starts with an empty layer
   clearSquadIdentity();
   try{if(App.ws)App.ws.close();}catch(_){}
   App.ws=null;App.connected=false;

@@ -60,15 +60,22 @@ function drawBackground(hbBeat){
       b.beginPath();b.arc(x,y,r,0,Math.PI*2);b.fill();
     }
   }
-  ctx.drawImage(bgCache,0,0,VW,VH);
+  ctx.drawImage(bgCache,0,0,VW,VH); // static gradient/speckle backdrop — never animated, no SVG equivalent needed, always drawn regardless of tier
+
+  // svgFX.js's syncBackground() is an SVG replacement for the three
+  // ANIMATED pieces below (veins/glow-wash/floating-cells/drifting-
+  // organisms) — gated by Settings.svgBackground (Ultra only, see
+  // settings.js QUALITY_PRESETS). useCanvasBackground() reads that same
+  // setting, so canvas and SVG can never both draw these at once.
+  const svgOwnsBackground=typeof SvgFX!=='undefined'&&!SvgFX.useCanvasBackground();
 
   // Capillaries used to be baked into bgCache as static lines. Now drawn live
   // each frame so they can pulse with the Body's heartbeat (hbBeat, same
   // signal that scales the core in drawCore) — the whole arena reads as
   // living tissue instead of a painted backdrop.
-  if(Settings.veins)drawVeins(hbBeat||0); // settings gate: veins
+  if(Settings.veins&&!svgOwnsBackground)drawVeins(hbBeat||0); // settings gate: veins
 
-  if(Settings.backgroundFx){ // settings gate: backgroundFx — the player's own
+  if(Settings.backgroundFx&&!svgOwnsBackground){ // settings gate: backgroundFx — the player's own
     // choice is authoritative here. COMPACT/REDUCED no longer silently veto
     // this the way they used to: Low/Medium presets already set
     // backgroundFx:false themselves (see settings.js QUALITY_PRESETS), so a
@@ -198,6 +205,7 @@ function drawFloatingCells(){
    order so it sits above entities, same visual idea as a cloud shadow. */
 function drawDriftingOrganisms(dt){
   if(REDUCED||!Settings.backgroundFx)return; // settings gate: backgroundFx
+  if(typeof SvgFX!=='undefined'&&!SvgFX.useCanvasBackground())return; // SVG's syncBackground owns this at the tier where svgBackground is on — see drawBackground's own svgOwnsBackground note
   if(!driftOrganisms)driftOrganisms=[];
   // spawn a new one occasionally — COMPACT no longer blocks this; the
   // backgroundFx check above (and Low/Medium presets already setting it
@@ -267,21 +275,31 @@ function drawCore(view,hbBeat){
   const healthy={r:62,g:232,b:200},dying={r:122,g:44,b:66};
   const col={r:Math.round(lerp(dying.r,healthy.r,pc)),g:Math.round(lerp(dying.g,healthy.g,pc)),b:Math.round(lerp(dying.b,healthy.b,pc))};
   const pulse=1+hbBeat*0.03*pc;
+  // Same skip-body reasoning as drawEnemies/drawPlayers — body_core.svg's
+  // own syncCore() reproduces the same health-tissue color lerp from the
+  // same bodyHp/bodyHpMax ratio (verified: see svgFX.js syncCore), plus a
+  // sickness-texture overlay canvas doesn't have, so the filled circle +
+  // radial tick lines here are redundant once the sprite is up. BODY/HP
+  // text and the critical ring are NOT in body_core.svg (checked directly:
+  // no <text>/<tspan> in the file) so those stay canvas-only regardless.
+  const bodyDrawn=!(Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyCore&&SvgFX.hasReadyCore());
   ctx.save();
   ctx.translate(c.x,c.y);ctx.scale(pulse,pulse);
   const spr=glowSprite('#'+((1<<24)|(col.r<<16)|(col.g<<8)|col.b).toString(16).slice(1),Math.round(r*1.5));
-  blitGlow(spr,0,0,0.30+hbBeat*0.10);
-  ctx.fillStyle=`rgb(${col.r},${col.g},${col.b})`;
-  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=2;ctx.stroke();
-  ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=3;
-  const tt=performance.now()/1000;
-  for(let i=0;i<5;i++){
-    const a=i/5*Math.PI*2+tt*0.1;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a)*r*0.15,Math.sin(a)*r*0.15);
-    ctx.lineTo(Math.cos(a+0.6)*r*0.7,Math.sin(a+0.6)*r*0.7);
-    ctx.stroke();
+  blitGlow(spr,0,0,0.30+hbBeat*0.10); // glow halo: not reproduced by the sprite, always drawn
+  if(bodyDrawn){
+    ctx.fillStyle=`rgb(${col.r},${col.g},${col.b})`;
+    ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=2;ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=3;
+    const tt=performance.now()/1000;
+    for(let i=0;i<5;i++){
+      const a=i/5*Math.PI*2+tt*0.1;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*r*0.15,Math.sin(a)*r*0.15);
+      ctx.lineTo(Math.cos(a+0.6)*r*0.7,Math.sin(a+0.6)*r*0.7);
+      ctx.stroke();
+    }
   }
   ctx.fillStyle='rgba(255,255,255,0.62)';
   ctx.font='bold 11px Cascadia Mono, Consolas, monospace';
@@ -352,7 +370,25 @@ function drawWarns(){
 }
 function drawTurrets(view){
   const spr=glowSprite('#ffd166',16);
+  const spr2=glowSprite('#ff4d6d',18);
   for(const t of view.turrets||[]){
+    if(t.corrupted){
+      // Corrupted (Unstable Turret Cores curse): hostile red glow, small
+      // pulsing ring, and an HP bar so the squad can see it's a real,
+      // damageable threat rather than a dead prop.
+      const pulse=0.35+0.15*Math.sin(performance.now()/220);
+      blitGlow(spr2,t.x,t.y,0.55+pulse*0.2);
+      ctx.fillStyle='#ff4d6d';
+      ctx.beginPath();ctx.arc(t.x,t.y,10,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(t.x,t.y,4,0,Math.PI*2);ctx.stroke();
+      if(t.hpMax>0){
+        const pct=clamp(t.hp/t.hpMax,0,1);
+        ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(t.x-14,t.y-20,28,4);
+        ctx.fillStyle='#ff4d6d';ctx.fillRect(t.x-14,t.y-20,28*pct,4);
+      }
+      continue;
+    }
     blitGlow(spr,t.x,t.y,0.4);
     ctx.fillStyle='#ffd166';
     ctx.beginPath();ctx.arc(t.x,t.y,9,0,Math.PI*2);ctx.fill();

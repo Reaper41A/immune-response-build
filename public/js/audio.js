@@ -79,6 +79,8 @@ const AudioSys={
       case'ui':this.tone(600,'sine',0.05,0.04,700);break;
       case'draftOpen':this.tone(500,'sine',0.09,0.05,650);this.tone(750,'sine',0.09,0.05,900,0.09);break;
       case'pulse':this.tone(240,'sine',0.25,0.05,480);break;
+      case'bossWindup':this.tone(90,'sawtooth',0.5,0.06,140);break;
+      case'bossSlam':this.noise(0.35,0.22,350);this.tone(70,'sawtooth',0.4,0.16,45);break;
       case'cloak':this.tone(500,'sine',0.12,0.035,250);break;
       case'split':this.noise(0.1,0.06,800);break;
       case'error':this.tone(200,'square',0.12,0.06,150);break;

@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="210" viewBox="-105 -105 210 210">
+  <defs>
+    <radialGradient id="prionGradient" cx="35%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#ececec"/>
+      <stop offset="52%" stop-color="#c9c9c9"/>
+      <stop offset="100%" stop-color="#6e6e6e"/>
+    </radialGradient>
+    <linearGradient id="plateGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ececec"/>
+      <stop offset="58%" stop-color="#c9c9c9"/>
+      <stop offset="100%" stop-color="#6e6e6e"/>
+    </linearGradient>
+    <filter id="aura-blur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="glint-blur" x="-300%" y="-300%" width="600%" height="600%">
+      <feGaussianBlur stdDeviation="1.4"/>
+    </filter>
+
+    <style>
+      /* Prion — armored/crystalline, the one hard-geometry enemy in the
+         roster. Idle is glacial (almost no movement, slow whole-cluster
+         rotation). Hit does NOT squash plates — one plate glints/shifts
+         instead (also the visual cue for its reflect mechanic). Critical =
+         seams glow/crack with light leaking through. Death = plates
+         shatter and fly apart individually, glass-break language. Note:
+         each plate's base `rotate()` is a static SVG attribute, preserved
+         here as the 0%/100% baseline inside each plate's own keyframes so
+         CSS animation doesn't clobber its resting angle. No attack state. */
+      #prion{transform-origin:0 0;animation:prionClusterSpin 14s linear infinite}
+      #aura{animation:prionAura 4s ease-in-out infinite}
+      #plate-1{transform-box:fill-box;transform-origin:center;animation:prionPlate1Idle 3.4s ease-in-out infinite}
+      #plate-2{transform-box:fill-box;transform-origin:center;animation:prionPlate2Idle 3.8s ease-in-out infinite .3s}
+      #plate-3{transform-box:fill-box;transform-origin:center;animation:prionPlate3Idle 3.2s ease-in-out infinite .6s}
+      #plate-4{transform-box:fill-box;transform-origin:center;animation:prionPlate4Idle 4.1s ease-in-out infinite .15s}
+      #plate-5{transform-box:fill-box;transform-origin:center;animation:prionPlate5Idle 3.6s ease-in-out infinite .45s}
+      #plate-6{transform-box:fill-box;transform-origin:center;animation:prionPlate6Idle 3.9s ease-in-out infinite .75s}
+      #core-glint{animation:prionCoreGlint 2.6s ease-in-out infinite}
+      #plate-seams{animation:prionSeamsIdle 5s ease-in-out infinite}
+      .damage-flash{opacity:0;pointer-events:none}
+
+      #prion.state-hit #plate-2{animation:prionDeflect .3s ease-out}
+      #prion.state-hit #core-glint{animation:prionCoreFlicker .3s ease-out}
+      #prion.state-hit .damage-flash{animation:prionFlash .18s ease-out}
+
+      #prion.state-critical #plate-seams{animation:prionSeamsCrit .4s ease-in-out infinite}
+      #prion.state-critical #core-glint{animation:prionCoreCritical .35s ease-in-out infinite}
+
+      #prion.state-death #plate-1{transform-box:fill-box;transform-origin:center;animation:prionShatter1 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-2{transform-box:fill-box;transform-origin:center;animation:prionShatter2 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-3{transform-box:fill-box;transform-origin:center;animation:prionShatter3 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-4{transform-box:fill-box;transform-origin:center;animation:prionShatter4 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-5{transform-box:fill-box;transform-origin:center;animation:prionShatter5 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-6{transform-box:fill-box;transform-origin:center;animation:prionShatter6 .7s cubic-bezier(.2,.7,.4,1) forwards}
+      #prion.state-death #plate-seams{animation:prionFadeOut .2s ease-out forwards}
+      #prion.state-death #core-glint{animation:prionCoreShatter .5s ease-out forwards}
+      #prion.state-death #aura{animation:prionFadeOut .5s ease-out forwards}
+
+      @keyframes prionClusterSpin{to{transform:rotate(360deg)}}
+      @keyframes prionAura{0%,100%{opacity:.12;transform:scale(.98)}50%{opacity:.2;transform:scale(1.03)}}
+      @keyframes prionPlate1Idle{0%,100%{transform:rotate(-7deg) scale(1)}50%{transform:rotate(-7deg) scale(1.008)}}
+      @keyframes prionPlate2Idle{0%,100%{transform:rotate(11deg) scale(1)}50%{transform:rotate(11deg) scale(1.01)}}
+      @keyframes prionPlate3Idle{0%,100%{transform:rotate(-5deg) scale(1)}50%{transform:rotate(-5deg) scale(1.006)}}
+      @keyframes prionPlate4Idle{0%,100%{transform:rotate(8deg) scale(1)}50%{transform:rotate(8deg) scale(1.009)}}
+      @keyframes prionPlate5Idle{0%,100%{transform:rotate(-13deg) scale(1)}50%{transform:rotate(-13deg) scale(1.007)}}
+      @keyframes prionPlate6Idle{0%,100%{transform:rotate(4deg) scale(1)}50%{transform:rotate(4deg) scale(1.008)}}
+      @keyframes prionCoreGlint{0%,100%{opacity:.55}50%{opacity:1}}
+      @keyframes prionSeamsIdle{0%,100%{opacity:.85}50%{opacity:.65}}
+      @keyframes prionDeflect{0%{transform:rotate(11deg) scale(1);filter:brightness(1)}30%{transform:rotate(19deg) scale(1.15);filter:brightness(1.8)}100%{transform:rotate(11deg) scale(1);filter:brightness(1)}}
+      @keyframes prionCoreFlicker{0%,100%{opacity:.9}50%{opacity:.2}}
+      @keyframes prionFlash{0%,100%{opacity:0}25%{opacity:.6}}
+      @keyframes prionSeamsCrit{0%,100%{opacity:.4;filter:brightness(1)}50%{opacity:1;filter:brightness(2.2)}}
+      @keyframes prionCoreCritical{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}
+      @keyframes prionShatter1{0%{transform:rotate(-7deg) scale(1);opacity:1}100%{transform:rotate(-70deg) translate(-30px,-24px) scale(.5);opacity:0}}
+      @keyframes prionShatter2{0%{transform:rotate(11deg) scale(1);opacity:1}100%{transform:rotate(80deg) translate(34px,-18px) scale(.5);opacity:0}}
+      @keyframes prionShatter3{0%{transform:rotate(-5deg) scale(1);opacity:1}100%{transform:rotate(-90deg) translate(-32px,20px) scale(.5);opacity:0}}
+      @keyframes prionShatter4{0%{transform:rotate(8deg) scale(1);opacity:1}100%{transform:rotate(60deg) translate(10px,34px) scale(.5);opacity:0}}
+      @keyframes prionShatter5{0%{transform:rotate(-13deg) scale(1);opacity:1}100%{transform:rotate(-75deg) translate(-18px,32px) scale(.5);opacity:0}}
+      @keyframes prionShatter6{0%{transform:rotate(4deg) scale(1);opacity:1}100%{transform:rotate(85deg) translate(28px,26px) scale(.5);opacity:0}}
+      @keyframes prionCoreShatter{0%{opacity:1;transform:scale(1)}40%{opacity:1;transform:scale(2)}100%{opacity:0;transform:scale(3)}}
+      @keyframes prionFadeOut{0%{opacity:1}100%{opacity:0}}
+    </style>
+  </defs>
+
+  <g id="prion" transform-origin="0 0">
+    <path id="aura" d="M0-48 L31-35 L45-5 L36 28 L8 46 L-27 39 L-45 12 L-38-22 L-16-44 Z"
+          fill="#ececec" opacity="0.14" filter="url(#aura-blur)"/>
+
+    <g id="plates" transform-box="fill-box" transform-origin="center">
+      <g id="plate-1" transform="rotate(-7)">
+        <path d="M-8-46 L18-39 L30-15 L13 2 L-13-7 L-24-29 Z"
+              fill="url(#plateGradient)" stroke="#858e97" stroke-width="1.2"/>
+        <path d="M-8-46 L18-39 L30-15 L13-23 Z" fill="#ececec" opacity="0.35"/>
+      </g>
+
+      <g id="plate-2" transform="rotate(11)">
+        <path d="M20-35 L43-13 L39 13 L18 21 L5 2 L10-21 Z"
+              fill="url(#plateGradient)" stroke="#7d8790" stroke-width="1.2"/>
+        <path d="M20-35 L43-13 L27-7 L10-21 Z" fill="#ececec" opacity="0.3"/>
+      </g>
+
+      <g id="plate-3" transform="rotate(-5)">
+        <path d="M-39-18 L-14-8 L-7 17 L-28 35 L-45 15 Z"
+              fill="url(#plateGradient)" stroke="#7b858e" stroke-width="1.2"/>
+        <path d="M-39-18 L-14-8 L-22 8 L-45 15 Z" fill="#ececec" opacity="0.28"/>
+      </g>
+
+      <g id="plate-4" transform="rotate(8)">
+        <path d="M-8-9 L17-1 L29 20 L10 43 L-13 31 L-20 10 Z"
+              fill="url(#plateGradient)" stroke="#747e87" stroke-width="1.2"/>
+        <path d="M-8-9 L17-1 L10 15 L-20 10 Z" fill="#ececec" opacity="0.3"/>
+      </g>
+
+      <g id="plate-5" transform="rotate(-13)">
+        <path d="M-31 20 L-9 29 L-4 45 L-25 48 L-43 35 Z"
+              fill="url(#plateGradient)" stroke="#747e87" stroke-width="1.2"/>
+        <path d="M-31 20 L-9 29 L-25 38 L-43 35 Z" fill="#ececec" opacity="0.22"/>
+      </g>
+
+      <g id="plate-6" transform="rotate(4)">
+        <path d="M18 16 L39 12 L47 30 L28 45 L9 37 Z"
+              fill="url(#plateGradient)" stroke="#707a83" stroke-width="1.2"/>
+        <path d="M18 16 L39 12 L31 27 L9 37 Z" fill="#ececec" opacity="0.22"/>
+      </g>
+    </g>
+
+    <g id="plate-seams" fill="none" stroke="#66717b" stroke-width="1.5" stroke-linecap="round" opacity="0.9">
+      <path d="M-24-29 Q-4-20 10-21"/>
+      <path d="M13 2 Q20 9 18 21"/>
+      <path d="M-13-7 Q-8 1 -7 17"/>
+      <path d="M-28 35 Q-18 29 -13 31"/>
+      <path d="M10 43 Q19 36 28 45"/>
+    </g>
+
+    <g id="core-glint" transform-box="fill-box" transform-origin="center">
+      <circle cx="0" cy="4" r="3.2" fill="#f7fbff" opacity="0.9" filter="url(#glint-blur)"/>
+      <circle cx="0" cy="4" r="1.25" fill="#ffffff"/>
+    </g>
+
+    <path id="damage-flash"
+          d="M0-48 L43-13 L47 30 L28 45 L-25 48 L-45 15 L-39-18 Z"
+          fill="#ffffff" opacity="0"/>
+  </g>
+</svg>

@@ -78,6 +78,12 @@ function callout(text,color,sys,who){
 
 let lastHurtFlash=0;
 function handleEvent(e){
+  // Additive hook for the animated-SVG overlay (svgFX.js) — guarded so a
+  // missing/broken SvgFX (e.g. script failed to load) can never take down
+  // the existing particle/audio/callout pipeline below it.
+  if(typeof SvgFX!=='undefined'){
+    try{SvgFX.onEvent(e);}catch(err){console.error('SvgFX.onEvent error:',err);}
+  }
   switch(e.k){
     case'shot':
       spawnParticle(e.x,e.y,Math.cos(e.a)*90,Math.sin(e.a)*90,0.1,5,e.color,'muzzle');
@@ -152,6 +158,18 @@ function handleEvent(e){
       spawnParticle(e.x,e.y-10,0,-30,0.5,9,'#8fe36a','glyph');
       break;
     case'pulse':ringFx(e.x,e.y,e.r,'#ffe27a',0.6);AudioSys.play('pulse');break;
+    case'slamWindup':
+      // Warning ring at the impact point, reusing drawWarns' existing
+      // FX.warns queue (see render.js drawWarns) rather than a new draw
+      // path — same telegraph visual already used for spawn warnings.
+      // Note: drawWarns' ring radius is a fixed grow-animation (46->106px),
+      // not driven by e.r — it's a decorative "something's coming" cue, not
+      // a literal preview of the hit radius, same as the existing
+      // 'incoming' spawn-warning case below already behaves.
+      FX.warns.push({x:e.x,y:e.y,t:e.windup,max:e.windup,big:true});
+      AudioSys.play('bossWindup');
+      break;
+    case'slam':ringFx(e.x,e.y,e.r,'#ff4d6d',0.45);AudioSys.play('bossSlam');shake(14);break;
     case'hazardCloud':ringFx(e.x,e.y,56,'#d4ff4d',0.4);break;
     case'incoming':FX.warns.push({x:e.x,y:e.y,t:0.85,max:0.85,big:e.big});break;
     case'bossSpawn':

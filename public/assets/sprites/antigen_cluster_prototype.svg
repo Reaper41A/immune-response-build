@@ -1,0 +1,282 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="210" height="210"
+     viewBox="-105 -105 210 210">
+
+  <defs>
+    <!-- Shared colony palette: upper-left light, lower-right depth -->
+    <radialGradient id="antigenLobeGradient" cx="35%" cy="30%" r="72%">
+      <stop offset="0%"   stop-color="#ffd6ee"/>
+      <stop offset="48%"  stop-color="#ff9fd6"/>
+      <stop offset="78%"  stop-color="#d875aa"/>
+      <stop offset="100%" stop-color="#a3527f"/>
+    </radialGradient>
+
+    <linearGradient id="antigenSeamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#8b456c"/>
+      <stop offset="100%" stop-color="#a3527f"/>
+    </linearGradient>
+
+    <radialGradient id="antigenHighlightGradient" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".72"/>
+      <stop offset="45%" stop-color="#ffd6ee" stop-opacity=".34"/>
+      <stop offset="100%" stop-color="#ffd6ee" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="antigenAuraBlur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+
+    <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+
+    <!-- One shared outer colony silhouette for the hit flash. -->
+    <path id="antigen-colony-outline"
+      d="M -12,-50
+         C 0,-57 17,-56 29,-48
+         C 42,-40 49,-28 50,-14
+         C 55,-4 57,8 52,19
+         C 48,29 40,36 29,41
+         C 19,52 7,58 -7,55
+         C -19,53 -29,47 -36,39
+         C -48,35 -56,26 -58,15
+         C -61,2 -56,-10 -49,-18
+         C -51,-30 -47,-41 -38,-48
+         C -30,-55 -20,-57 -12,-50 Z"/>
+
+    <style>
+      /* Antigen Cluster — three fused lobes. Idle breathing is out-of-phase
+         per lobe on purpose (never a synchronized "one blob" pulse — the
+         whole point is that these are 3 distinct organisms). Death is the
+         one animation in the roster that reads as "coming apart" rather
+         than "bursting": lobes separate and drift, foreshadowing the split
+         into bacteria. No attack state (contact damage only). */
+      #antigenCluster{transform-origin:0 0}
+      #aura{animation:antigenAura 3.2s ease-in-out infinite}
+      #lobe-1{animation:antigenLobe1 2.6s ease-in-out infinite}
+      #lobe-2{animation:antigenLobe2 2.3s ease-in-out infinite .35s}
+      #lobe-3{animation:antigenLobe3 2.9s ease-in-out infinite .65s}
+      #membrane-shared-highlight{animation:antigenHighlight 4.5s ease-in-out infinite}
+      #specular-flecks{animation:antigenFlecks 4.5s ease-in-out infinite}
+      #damage-flash{opacity:0;pointer-events:none}
+
+      #antigenCluster.state-move #lobe-1{animation-duration:1.5s}
+      #antigenCluster.state-move #lobe-2{animation-duration:1.3s}
+      #antigenCluster.state-move #lobe-3{animation-duration:1.7s}
+
+      #antigenCluster.state-hit #colony{animation:antigenJolt .22s ease-out}
+      #antigenCluster.state-hit #lobe-2{animation:antigenFlinchHard .26s ease-out}
+      #antigenCluster.state-hit #lobe-1,#antigenCluster.state-hit #lobe-3{animation:antigenFlinchSoft .22s ease-out}
+      #antigenCluster.state-hit #damage-flash{animation:antigenFlash .22s ease-out}
+
+      #antigenCluster.state-critical #junction-lines{animation:antigenJunctionStrain .5s ease-in-out infinite}
+      #antigenCluster.state-critical #colony{animation:antigenCriticalWobble .7s ease-in-out infinite}
+
+      #antigenCluster.state-death #aura{animation:antigenAuraFade .8s ease-out forwards}
+      #antigenCluster.state-death #lobe-1{animation:antigenSeparate1 .85s ease-in forwards}
+      #antigenCluster.state-death #lobe-2{animation:antigenSeparate2 .85s ease-in forwards .05s}
+      #antigenCluster.state-death #lobe-3{animation:antigenSeparate3 .85s ease-in forwards .1s}
+      #antigenCluster.state-death #junction-lines{animation:antigenJunctionBreak .3s ease-out forwards}
+      #antigenCluster.state-death #membrane-shared-highlight,
+      #antigenCluster.state-death #specular-flecks{animation:antigenFadeOut .4s ease-out forwards}
+
+      @keyframes antigenAura{0%,100%{opacity:.2;transform:scale(.96)}50%{opacity:.32;transform:scale(1.04)}}
+      @keyframes antigenLobe1{0%,100%{transform:scale(1)}50%{transform:scale(1.025,.98)}}
+      @keyframes antigenLobe2{0%,100%{transform:scale(1) translate(0,0)}50%{transform:scale(1.03,.975) translate(.5px,-.5px)}}
+      @keyframes antigenLobe3{0%,100%{transform:scale(1) translate(0,0)}50%{transform:scale(.98,1.03) translate(-.5px,.5px)}}
+      @keyframes antigenHighlight{0%,100%{opacity:.7}50%{opacity:1}}
+      @keyframes antigenFlecks{0%,100%{opacity:.7}50%{opacity:1}}
+      @keyframes antigenJolt{0%{transform:translate(0,0)}30%{transform:translate(2px,-1.5px)}100%{transform:translate(0,0)}}
+      @keyframes antigenFlinchHard{0%{transform:scale(1)}35%{transform:scale(1.16,.82) translate(1.5px,-1px)}100%{transform:scale(1)}}
+      @keyframes antigenFlinchSoft{0%{transform:scale(1)}35%{transform:scale(1.06,.94)}100%{transform:scale(1)}}
+      @keyframes antigenFlash{0%,100%{opacity:0}22%{opacity:.85}}
+      @keyframes antigenJunctionStrain{0%,100%{opacity:.78}50%{opacity:.3}}
+      @keyframes antigenCriticalWobble{0%,100%{transform:scale(1,1) rotate(0deg)}50%{transform:scale(1.02,.98) rotate(.8deg)}}
+      @keyframes antigenAuraFade{0%{opacity:1}100%{opacity:0;transform:scale(1.3)}}
+      @keyframes antigenSeparate1{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(-8px,10px) rotate(-14deg);opacity:0}}
+      @keyframes antigenSeparate2{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(20px,-10px) rotate(22deg);opacity:0}}
+      @keyframes antigenSeparate3{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(-20px,-6px) rotate(-24deg);opacity:0}}
+      @keyframes antigenJunctionBreak{0%{opacity:.78}100%{opacity:0}}
+      @keyframes antigenFadeOut{0%{opacity:1}100%{opacity:0}}
+    </style>
+  </defs>
+
+  <!-- Root: world translation + state classes are applied here by JS. -->
+  <g id="antigenCluster" transform-origin="0 0">
+
+    <!-- Soft aura: deliberately behind the entire fused colony. -->
+    <g id="aura" transform-box="fill-box" transform-origin="center">
+      <path
+        d="M -10,-54
+           C 5,-63 23,-60 36,-50
+           C 51,-39 56,-25 56,-10
+           C 63,4 61,20 52,31
+           C 45,43 34,49 22,53
+           C 11,63 -5,65 -18,58
+           C -33,54 -43,46 -49,37
+           C -62,31 -66,17 -62,4
+           C -65,-9 -57,-23 -51,-29
+           C -54,-43 -43,-54 -30,-59
+           C -22,-62 -15,-60 -10,-54 Z"
+        fill="#ffd6ee" opacity=".20" filter="url(#antigenAuraBlur)"/>
+    </g>
+
+    <!-- Three visibly distinct organisms, fused into one colony. -->
+    <g id="colony" transform-box="fill-box" transform-origin="center">
+
+      <!-- Largest central lobe -->
+      <g id="lobe-1" transform-box="fill-box" transform-origin="center">
+        <path id="lobe-1-shape"
+          d="M -18,-37
+             C -7,-46 9,-48 22,-42
+             C 36,-36 43,-23 42,-8
+             C 43,6 36,19 25,28
+             C 14,39 -1,43 -15,38
+             C -29,34 -39,23 -41,9
+             C -44,-5 -38,-19 -29,-27
+             C -26,-32 -22,-35 -18,-37 Z"
+          fill="url(#antigenLobeGradient)"/>
+        <!-- restrained lower-right occlusion, not a second color identity -->
+        <path
+          d="M -15,37
+             C 0,42 15,38 26,28
+             C 36,19 42,7 42,-7
+             C 43,8 38,23 26,33
+             C 13,44 -3,47 -17,41 Z"
+          fill="#a3527f" opacity=".16"/>
+        <!-- upper-left membrane gloss -->
+        <path id="lobe-1-highlight"
+          d="M -29,-27
+             C -19,-39 -4,-44 10,-42
+             C 18,-41 25,-37 30,-32
+             C 18,-37 6,-36 -5,-31
+             C -14,-27 -20,-21 -25,-14
+             C -29,-18 -31,-23 -29,-27 Z"
+          fill="url(#antigenHighlightGradient)"/>
+        <ellipse cx="2" cy="-31" rx="5.5" ry="2.6"
+                 fill="#ffffff" opacity=".34" filter="url(#softBlur)"/>
+      </g>
+
+      <!-- Upper-right lobe -->
+      <g id="lobe-2" transform-box="fill-box" transform-origin="center">
+        <path id="lobe-2-shape"
+          d="M 16,-40
+             C 25,-49 38,-50 48,-45
+             C 59,-40 65,-30 64,-19
+             C 64,-8 58,1 48,7
+             C 39,13 28,12 20,6
+             C 11,0 7,-10 8,-21
+             C 9,-29 11,-36 16,-40 Z"
+          fill="url(#antigenLobeGradient)"/>
+        <path
+          d="M 31,-48
+             C 43,-50 55,-43 61,-34
+             C 67,-24 65,-12 59,-4
+             C 64,-17 58,-30 48,-36
+             C 41,-40 34,-40 27,-38 Z"
+          fill="#a3527f" opacity=".14"/>
+        <path id="lobe-2-highlight"
+          d="M 15,-34
+             C 21,-43 34,-47 45,-43
+             C 50,-41 54,-38 57,-34
+             C 48,-37 40,-36 32,-32
+             C 25,-29 20,-24 16,-18
+             C 13,-23 12,-29 15,-34 Z"
+          fill="url(#antigenHighlightGradient)"/>
+        <ellipse cx="34" cy="-37" rx="4.5" ry="2.1"
+                 fill="#ffffff" opacity=".30" filter="url(#softBlur)"/>
+      </g>
+
+      <!-- Lower-left lobe -->
+      <g id="lobe-3" transform-box="fill-box" transform-origin="center">
+        <path id="lobe-3-shape"
+          d="M -31,7
+             C -41,1 -54,4 -61,13
+             C -69,22 -69,35 -62,45
+             C -55,55 -43,59 -31,56
+             C -20,54 -12,46 -10,35
+             C -7,24 -12,14 -21,9
+             C -24,7 -28,6 -31,7 Z"
+          fill="url(#antigenLobeGradient)"/>
+        <path
+          d="M -62,45
+             C -54,55 -42,59 -31,56
+             C -20,54 -12,46 -10,35
+             C -17,45 -28,49 -39,48
+             C -49,47 -57,42 -62,35 Z"
+          fill="#a3527f" opacity=".16"/>
+        <path id="lobe-3-highlight"
+          d="M -60,16
+             C -53,7 -42,5 -32,9
+             C -25,11 -20,16 -17,21
+             C -25,18 -33,18 -41,21
+             C -49,24 -55,29 -59,35
+             C -63,29 -64,22 -60,16 Z"
+          fill="url(#antigenHighlightGradient)"/>
+        <ellipse cx="-43" cy="14" rx="4.2" ry="2"
+                 fill="#ffffff" opacity=".28" filter="url(#softBlur)"/>
+      </g>
+
+      <!-- Junction seams sit on top of all fills and make the colony read as fused. -->
+      <g id="junction-lines" fill="none" stroke="url(#antigenSeamGradient)"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+         opacity=".78">
+        <!-- central ↔ upper-right -->
+        <path id="junction-1"
+          d="M 13,-27 C 19,-20 22,-11 20,-3 C 18,2 15,5 12,7"/>
+        <!-- central ↔ lower-left -->
+        <path id="junction-2"
+          d="M -25,17 C -20,21 -16,27 -15,34 C -15,37 -14,40 -12,42"/>
+        <!-- subtle three-way membrane crease -->
+        <path id="junction-3"
+          d="M -4,8 C 3,8 9,6 12,2"/>
+      </g>
+
+    </g>
+
+    <!-- One continuous soft highlight arc across the shared outer light source. -->
+    <g id="membrane-shared-highlight" fill="none"
+       stroke="#ffd6ee" stroke-linecap="round">
+      <path
+        d="M -43,-25
+           C -35,-43 -17,-53 2,-53
+           C 20,-53 35,-45 46,-34
+           C 52,-28 55,-20 56,-12"
+        stroke-width="3.4" opacity=".48"/>
+      <path
+        d="M -38,-28
+           C -29,-42 -14,-48 1,-49
+           C 17,-49 30,-44 40,-36"
+        stroke-width="1.5" opacity=".62"/>
+    </g>
+
+    <!-- Tiny shared specular flecks: restrained so the three lobes still feel like one organism. -->
+    <g id="specular-flecks" fill="#ffffff" opacity=".38">
+      <ellipse cx="-26" cy="-34" rx="2.5" ry="1.2"/>
+      <ellipse cx="31" cy="-39" rx="2.1" ry="1.0"/>
+      <ellipse cx="-48" cy="11" rx="1.9" ry=".9"/>
+    </g>
+
+    <!-- Full-colony hit flash; JS only needs to synchronize one opacity value. -->
+    <g id="damage-flash" opacity="0" pointer-events="none">
+      <use href="#antigen-colony-outline" fill="#ffffff"/>
+      <!-- overlap compensation keeps the flash visibly covering the three-body silhouette -->
+      <path
+        d="M -18,-37 C -7,-46 9,-48 22,-42 C 36,-36 43,-23 42,-8
+           C 43,6 36,19 25,28 C 14,39 -1,43 -15,38
+           C -29,34 -39,23 -41,9 C -44,-5 -38,-19 -29,-27 Z"
+        fill="#ffffff"/>
+      <path
+        d="M 16,-40 C 25,-49 38,-50 48,-45 C 59,-40 65,-30 64,-19
+           C 64,-8 58,1 48,7 C 39,13 28,12 20,6
+           C 11,0 7,-10 8,-21 C 9,-29 11,-36 16,-40 Z"
+        fill="#ffffff"/>
+      <path
+        d="M -31,7 C -41,1 -54,4 -61,13 C -69,22 -69,35 -62,45
+           C -55,55 -43,59 -31,56 C -20,54 -12,46 -10,35
+           C -7,24 -12,14 -21,9 C -24,7 -28,6 -31,7 Z"
+        fill="#ffffff"/>
+    </g>
+
+  </g>
+</svg>

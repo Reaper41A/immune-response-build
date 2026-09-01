@@ -84,10 +84,11 @@ function spawnEnemyEntity(defKey,opts={}){
     explodesOnDeath:!!def.explodesOnDeath,
     splits:def.splits||null,regen:def.regen||null,
     pulseCfg:def.pulse||null,pulseT:def.pulse?rand(1,def.pulse.interval):0,
+    slamCfg:def.slam||null,slamT:def.slam?def.slam.interval:0,slamWindupT:0,
     trailCfg:def.trail||null,trailT:0,
     cloakCfg:def.cloak||null,cloakT:def.cloak?def.cloak.interval:0,cloaked:false,cloakLeft:0,
     isElite,eliteMods,shieldHp:eliteMods==='shield'?hp*0.3:0,
-    hitFlash:0,lastHitT:-99,tauntedBy:0,_buffed:false,_buffPulseT:0,
+    hitFlash:0,lastHitT:-99,tauntedBy:0,_buffed:false,_buffPulseT:0,_justPulsed:0,_justSlammed:0,
     alive:true,regenShimmer:false,
     segments:defKey==='worm_seg'?makeWormSegments(sp):null,
     matureTimer:defKey==='spore'?rand(4,7):0,
@@ -155,7 +156,7 @@ function squadDamageMult(shooter){
   if(SIM.debuffs.brain)m*=0.88;
   const bcell=SIM.players.find(p=>p.cls==='bcell'&&p.alive&&p._teamDmgAura&&p.abilityCd<=0);
   if(bcell)m*=1+bcell._teamDmgAura;
-  if(shooter&&shooter._overdriveDmg)m*=1.2;
+  if(shooter&&shooter._overdriveDmg)m*=shooter._odMeltdownCurse?1.35:1.2;
   if(shooter&&shooter._overhealDmgBuff>0)m*=1.15;
   return m;
 }

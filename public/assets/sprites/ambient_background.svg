@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <!--
+    Ambient background layer — SVG replacement for render.js's drawVeins/
+    drawFloatingCells/drawDriftingOrganisms. Unlike every other sprite in
+    this folder, this is not a per-entity template cloned by makeInstance —
+    it's a single persistent document that svgFX.js's syncBackground()
+    populates directly (veins are fixed children here; cells/organisms are
+    templates under <defs> that get cloned into #cell-layer/#organism-layer
+    at runtime, since their counts/lifetimes are dynamic).
+
+    viewBox is 0 0 1280 720 — WORLD units (VW/VH), not a self-centered
+    per-entity viewBox like every other sprite here. That's deliberate:
+    this SVG is stretched to exactly cover #svgLayer's world rect by CSS
+    (see svgFX.js syncBackground's own transform setup), so every child's
+    coordinates ARE world coordinates directly — no worldToScreen math
+    needed for internal geometry, only for the top-level placement.
+
+    Nothing in this file drives itself via CSS keyframes for the two
+    game-state-linked systems (vein pulse tempo tracks Body HP; organism
+    life/fade uses per-instance randomized durations) — those are JS-driven
+    every frame off inline style, same technique as body_core.svg's
+    health-tissue lerp. Floating-cell drift is also JS-driven (matches the
+    canvas version's sin/cos formula exactly) so cell positions don't
+    visually diverge from what canvas would have drawn; only each cell's
+    slow spin uses a CSS animation, since spin rate is constant and untied
+    to any game state.
+  -->
+  <defs>
+
+    <!-- floating-cell template: cloned 7x into #cell-layer by syncBackground.
+         Hexagonal blob + nucleus fleck, matches drawFloatingCells' shape
+         and alpha (0.16 body / 0.22 nucleus) exactly. -->
+    <g id="floating-cell-template">
+      <path class="cell-body" d="" fill="currentColor" opacity="0.16"/>
+      <circle class="cell-nucleus" r="0" fill="currentColor" opacity="0.22"/>
+    </g>
+
+    <!-- ambient-glow template: cloned 9x into #glow-layer. Matches
+         drawBackground's own ambientSeeds wash — soft round blobs, alpha
+         0.045, slow sin/cos drift. This is a THIRD, separate ambient system
+         from floating cells (which have a defined hexagonal cell shape);
+         this one is a plain filled circle in canvas too (no blur/shadow),
+         so no filter is applied here either — the low alpha alone (0.045)
+         is what reads as "soft" in the original. -->
+    <g id="ambient-glow-template">
+      <circle class="glow-body" r="0" fill="currentColor"/>
+    </g>
+
+    <!-- drifting-organism template: cloned into #organism-layer on spawn,
+         removed on despawn (mirrors driftOrganisms' array lifecycle
+         exactly — spawn/fade-in/fade-out/despawn all JS-timed per instance,
+         since maxLife is randomized per organism same as canvas). -->
+    <g id="drifting-organism-template">
+      <path class="organism-body" d="" fill="currentColor"/>
+      <circle class="organism-core" r="0" fill="currentColor"/>
+    </g>
+  </defs>
+
+  <style>
+    #ambient-bg{pointer-events:none}
+    .vein-stroke{fill:none;stroke:#7fd6ff;stroke-linecap:round}
+    .vein-pulse{fill:none;stroke:#c8fff0;stroke-linecap:round;opacity:0}
+    #cell-layer .cell-body{transform-box:fill-box;transform-origin:center;animation:cellSpin linear infinite}
+    #organism-layer .organism-core{opacity:0}
+    @keyframes cellSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  </style>
+
+  <g id="ambient-bg">
+    <g id="vein-layer"></g>
+    <g id="glow-layer"></g>
+    <g id="cell-layer"></g>
+    <g id="organism-layer"></g>
+  </g>
+</svg>

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="-32 -32 64 64">
+  <defs>
+    <radialGradient id="baseGradient" cx="35%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#d8fff5"/>
+      <stop offset="45%" stop-color="#9fe5d5"/>
+      <stop offset="78%" stop-color="#5fa998"/>
+      <stop offset="100%" stop-color="#3d7066"/>
+    </radialGradient>
+    <linearGradient id="emitterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0fff9"/>
+      <stop offset="45%" stop-color="#c8fff0"/>
+      <stop offset="100%" stop-color="#7de3c8"/>
+    </linearGradient>
+    <filter id="auraBlur" x="-200%" y="-200%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+
+    <style>
+      /* Turret — deployed defense structure. #emitter's aim rotation is set
+         inline by JS every frame (tracks nearest enemy — continuous world
+         state, not a CSS keyframe), so CSS here only owns the idle hum and
+         event-driven states layered underneath that rotation. .corrupted is
+         the "Unstable Turret Cores" curse outcome (turns hostile) — reuses
+         the pre-built #corruption-overlay group. */
+      #turret{transform-origin:0 0}
+      #aura{animation:turretAura 2.4s ease-in-out infinite}
+      #base{transform-box:fill-box;transform-origin:center;animation:turretBaseHum 3s ease-in-out infinite}
+      #emitter-core{animation:turretCoreGlow 1.4s ease-in-out infinite}
+      #corruption-overlay{transition:opacity .4s ease}
+
+      #turret.firing #emitter{animation:turretRecoil .18s ease-out}
+      #turret.firing #emitter-core{animation:turretFireFlash .18s ease-out}
+
+      #turret.corrupted #corruption-overlay{opacity:1;animation:turretCorruptPulse 1.2s ease-in-out infinite}
+      #turret.corrupted #base{animation:turretCorruptHum 1.8s ease-in-out infinite}
+      #turret.corrupted #emitter-core{animation:turretCorruptCore 1s ease-in-out infinite}
+      #turret.corrupted #aura{animation:turretCorruptAura 1.2s ease-in-out infinite}
+
+      #turret.state-hit #base{animation:turretHit .2s ease-out}
+
+      #turret.destroyed{animation:turretDestroy .5s ease-in forwards}
+      #turret.destroyed #emitter{animation:turretDestroyEmitter .5s ease-in forwards}
+
+      @keyframes turretAura{0%,100%{opacity:.14;transform:scale(.95)}50%{opacity:.24;transform:scale(1.08)}}
+      @keyframes turretBaseHum{0%,100%{transform:scale(1,1)}50%{transform:scale(1.015,.99)}}
+      @keyframes turretCoreGlow{0%,100%{opacity:.7}50%{opacity:1}}
+      @keyframes turretRecoil{0%{transform:translateY(0) scale(1)}30%{transform:translateY(1.5px) scale(.94,1.08)}100%{transform:translateY(0) scale(1)}}
+      @keyframes turretFireFlash{0%,100%{opacity:.82;transform:scale(1)}30%{opacity:1;transform:scale(2.2)}}
+      @keyframes turretCorruptPulse{0%,100%{opacity:.75}50%{opacity:1}}
+      @keyframes turretCorruptHum{0%,100%{transform:scale(1,1) translate(0,0)}25%{transform:scale(1.02,.98) translate(-.5px,0)}75%{transform:scale(.99,1.02) translate(.5px,0)}}
+      @keyframes turretCorruptCore{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+      @keyframes turretCorruptAura{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.55;transform:scale(1.15)}}
+      @keyframes turretHit{0%{transform:scale(1)}35%{transform:scale(1.06,.93)}100%{transform:scale(1)}}
+      @keyframes turretDestroy{0%{transform:scale(1);opacity:1}40%{transform:scale(1.1,.85);opacity:1}100%{transform:scale(.7,.3);opacity:0}}
+      @keyframes turretDestroyEmitter{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(6px,-12px) rotate(60deg);opacity:0}}
+    </style>
+  </defs>
+
+  <!-- Renderer translates this root and applies state classes. -->
+  <g id="turret" transform-origin="0 0">
+
+    <ellipse id="aura" cx="0" cy="1" rx="16" ry="13"
+      fill="#c8fff0" opacity=".18" filter="url(#auraBlur)"/>
+
+    <!-- Deployed mechanical/organic mount -->
+    <g id="base" transform-box="fill-box" transform-origin="center">
+      <path id="base-shape"
+        d="M -13,5
+           C -14,1 -11,-5 -6,-8
+           C -3,-11 4,-11 8,-8
+           C 12,-5 14,0 13,5
+           C 10,9 5,11 0,11
+           C -6,11 -11,9 -13,5 Z"
+        fill="url(#baseGradient)"
+        stroke="#3d7066" stroke-width="1"/>
+
+      <!-- Structural mount plates -->
+      <path d="M -9,3 C -7,7 -3,8 0,8 C 4,8 8,6 10,3"
+        fill="none" stroke="#d8fff5" stroke-opacity=".32" stroke-width="1.2"
+        stroke-linecap="round"/>
+      <path d="M -6,-5 C -3,-7 3,-7 6,-5"
+        fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="1"
+        stroke-linecap="round"/>
+    </g>
+
+    <!-- Firing assembly -->
+    <g id="emitter" transform-box="fill-box" transform-origin="center">
+      <path
+        d="M -3,-5 L -1,-12 Q 0,-14 1,-12 L 3,-5
+           Q 2,-3 0,-3 Q -2,-3 -3,-5 Z"
+        fill="url(#emitterGradient)"
+        stroke="#5fa998" stroke-width=".8"/>
+      <circle id="emitter-core" cx="0" cy="-9" r="1.7"
+        fill="#ffffff" opacity=".82"/>
+    </g>
+
+    <!-- Hidden by default; renderer fades this in when corrupted. -->
+    <g id="corruption-overlay" opacity="0" pointer-events="none">
+      <path
+        d="M -11,-4 L -5,-1 L -7,5 L 0,3 L 4,9
+           M 5,-8 L 2,-3 L 8,0 L 6,5
+           M -2,-10 L 0,-6 L -4,-3"
+        fill="none" stroke="#ff4d6d" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+      <path
+        d="M -9,1 C -5,-2 -2,1 0,-2 C 3,-5 6,-2 10,-4
+           M -7,7 C -3,5 0,7 4,5"
+        fill="none" stroke="#ff4d6d" stroke-width=".9" opacity=".65"/>
+    </g>
+  </g>
+</svg>

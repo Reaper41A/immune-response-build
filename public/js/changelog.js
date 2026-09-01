@@ -60,6 +60,24 @@
 
 const CHANGELOG=[
   {
+    version:'1.6.0',
+    date:'2026-08-31',
+    title:'Cursed Cards & Full Card Rotation',
+    sections:{
+      added:[
+        'Cursed cards: a new risk/reward tier that can appear in ALL three draft screens (Squad, Personal, Evolution). Each curse grants a strong buff paired with a real drawback \u2014 e.g. Unstable Turret Cores massively empowers your turrets but halves their HP; if one falls, it goes hostile and starts attacking the squad and the Body until destroyed. Curses roll independently from normal rarity (8% chance per slot) and are visually distinct: dashed red/pink border and a skull badge instead of the normal rarity tag.',
+        'Corrupted turrets: turrets can now be damaged and destroyed by enemies when Unstable Turret Cores is active. A destroyed turret goes hostile \u2014 boosted HP/damage/attack speed, hunts the squad, falls back to attacking the Body core if no players are alive \u2014 and can be shot down again by the squad to remove the threat.',
+        'Card rotation roughly doubled across every draft pool: Squad 21\u219235, Personal 30\u219259, Evolution 40\u219260 \u2014 154 unique cards total, up from 91.'
+      ],
+      changed:[],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'A handful of older cards (Fast Ignition, Instant Reflex, Wide Slash, Preemptive Ward, Rapid Synthesis, and Absolute Aggro\u2019s reflect clause) described effects that were never actually implemented. These now do what their card text says.'
+      ]
+    }
+  },
+  {
     version:'1.5.0',
     date:'2026-08-30',
     title:'Draft System Overhaul',

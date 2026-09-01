@@ -42,10 +42,18 @@ function buildSnapshot(){
       mg:e.defKey==='macrophageMimic'?(e.revealed?2:(e.revealT>0?3:1)):0,
       dp:e.disguisePid||0,rg:e.regenShimmer?1:0,cl:e.cloaked?1:0,
       lg:e.lungeT>0?1:0,seg:e.segments?1:0,
+      // See main.js buildHostView for what pt/pf/st/sf/ba mean — kept
+      // identical across both view-builders so guests get the same svgFX
+      // behavior as the host (guestBuildView spreads these through untouched).
+      pt:e.pulseCfg?r1(clamp(1-e.pulseT/e.pulseCfg.interval,0,1)):0,
+      pf:e._justPulsed>0?1:0,
+      st:e.slamCfg?(e.slamWindupT>0?r1(clamp(1-e.slamWindupT/e.slamCfg.windup,0,1)):0):0,
+      sf:e._justSlammed>0?1:0,
+      ba:e.buffAura?1:0,
     })),
     projs:s.projectiles.map(p=>({x:r1(p.x),y:r1(p.y),c:p.color,tr:p.trail.map(t=>[r1(t.x),r1(t.y)]),sp:p.splash>0?1:0})),
     pickups:s.pickups.map(p=>({x:r1(p.x),y:r1(p.y),l:r1(p.life),w:r1(p.wobble)})),
-    turrets:s.turrets.map(t=>({x:r1(t.x),y:r1(t.y),r:t.range})),
+    turrets:s.turrets.map(t=>({x:r1(t.x),y:r1(t.y),r:t.range,corrupted:t.corrupted,hp:t.hp?Math.round(t.hp):0,hpMax:t.hpMax})),
     hazards:s.hazards.map(h=>({x:r1(h.x),y:r1(h.y),r:h.radius,l:r1(h.life)})),
     trails:s.trails.slice(-140).map(t=>({x:r1(t.x),y:r1(t.y),l:r1(t.life),w:t.w})),
     evs:s.flushedEvents||[],

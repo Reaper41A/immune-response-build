@@ -50,6 +50,7 @@ function planWave(waveNum){
 }
 function startWave(){
   SIM.waveActive=true;
+  SIM.phoenixUsedThisWave=false;
   SIM.spawnQueue=planWave(SIM.wave);
   SIM.pendingSpawns=[];
   // Small negative lead-in: the draft screen has just closed, so give the
@@ -90,10 +91,18 @@ function applyLeak(en){
 }
 function maybeDamageOrgan(){
   const k=choice(Object.keys(SIM.organs));
-  const chip=Math.round(randi(8,16)*(SIM.upgrades.organShield?0.6:1));
+  let chip=Math.round(randi(8,16)*(SIM.upgrades.organShield?0.6:1));
+  if(SIM.upgrades._organResistPct)chip=Math.round(chip*(1-SIM.upgrades._organResistPct/100));
   if(SIM.organs[k]>0){
+    const wasAbove30=SIM.organs[k]>=30;
     SIM.organs[k]=Math.max(0,SIM.organs[k]-chip);
     ev({k:'organ',key:k});
+    // Visceral Awareness (personal perk): early-warning ping the moment an
+    // organ FIRST crosses below 30% — checked here (not per-frame) so it
+    // fires exactly once per crossing instead of spamming every chip tick.
+    if(wasAbove30&&SIM.organs[k]<30&&SIM.players.some(p=>p._organAwarePerk)){
+      ev({k:'say',sys:true,text:`Warning: ${k} organ critical (below 30%)`,color:'#ff9f5a'});
+    }
     if(SIM.organs[k]<=0&&!SIM.debuffs[k]){
       SIM.debuffs[k]=true;
       const msgs={
@@ -102,7 +111,7 @@ function maybeDamageOrgan(){
         brain:'Brain swelling — squad damage -12%',
       };
       ev({k:'say',sys:true,text:msgs[k],color:'#ff4d6d'});
-      if(k==='heart')for(const p of SIM.players)p.speed*=0.85;
+      if(k==='heart')for(const p of SIM.players)if(!p._heartGuardPerk)p.speed*=0.85;
     }
   }
 }
@@ -300,7 +309,8 @@ function applyUpgrade(id){
     case'turret':
       if(SIM.turrets.length<4){
         const c=worldCore(),a=rand(0,Math.PI*2);
-        SIM.turrets.push({x:c.x+Math.cos(a)*170,y:c.y+Math.sin(a)*170,cd:0,range:220});
+        const hpMax=SIM.upgrades.riskyTurrets?110:220; // Unstable Turret Cores curse halves max HP
+        SIM.turrets.push({x:c.x+Math.cos(a)*170,y:c.y+Math.sin(a)*170,cd:0,range:220,hp:hpMax,hpMax,corrupted:false});
       }
       break;
     case'barrier':SIM.barrierCharges=Math.min(3,SIM.barrierCharges+1);break;
@@ -318,9 +328,30 @@ function applyUpgrade(id){
     case'lastLine':
       SIM.upgrades.lastLine=true;
       {const c=worldCore();
-       for(let i=0;i<2;i++){const a=rand(0,Math.PI*2);SIM.turrets.push({x:c.x+Math.cos(a)*190,y:c.y+Math.sin(a)*190,cd:0,range:240,heavy:true});}}
+       for(let i=0;i<2;i++){const a=rand(0,Math.PI*2);SIM.turrets.push({x:c.x+Math.cos(a)*190,y:c.y+Math.sin(a)*190,cd:0,range:240,heavy:true,hp:340,hpMax:340,corrupted:false});}}
       break;
     case'apexMetabolism':SIM.upgrades.apexMetabolism=true;break;
+    case'ammoEcon':SIM.upgrades.ammoEcon=(SIM.upgrades.ammoEcon||0)+1;for(const p of SIM.players){p.ammoMax=Math.round(p.ammoMax*(1+amt/100));p.ammo=Math.min(p.ammoMax,p.ammo+Math.round(p.ammoMax*amt/100));}break;
+    case'pickupMagnet':SIM.upgrades.pickupMagnet=(SIM.upgrades.pickupMagnet||0)+1;for(const p of SIM.players)p._pickupBonus=(p._pickupBonus||0)+amt;break;
+    case'critChanceSquad':SIM.upgrades.critChanceSquad=(SIM.upgrades.critChanceSquad||0)+1;SIM.upgrades._critChancePct=(SIM.upgrades._critChancePct||0)+amt;break;
+    case'reviveSpeed':SIM.upgrades.reviveSpeed=(SIM.upgrades.reviveSpeed||0)+1;SIM.upgrades._reviveSpeedPct=(SIM.upgrades._reviveSpeedPct||0)+amt;break;
+    case'organResist':SIM.upgrades.organResist=(SIM.upgrades.organResist||0)+1;SIM.upgrades._organResistPct=Math.min(50,(SIM.upgrades._organResistPct||0)+amt);break;
+    case'turretRange':SIM.upgrades.turretRange=true;for(const t of SIM.turrets)t.range*=1.4;break;
+    case'critDmgSquad':SIM.upgrades.critDmgSquad=true;break;
+    case'phoenixProtocol':SIM.upgrades.phoenixProtocol=true;break;
+    // ---- curses: strong buff paired with a real, permanent-for-the-run cost
+    case'c_glassCannon':SIM.upgrades._dmgPct=(SIM.upgrades._dmgPct||0)+20;SIM.bodyHpMax=Math.round(SIM.bodyHpMax*0.9);SIM.bodyHp=Math.min(SIM.bodyHp,SIM.bodyHpMax);SIM.upgrades.c_glassCannon=true;break;
+    case'c_overclock':SIM.upgrades._fireRatePct=(SIM.upgrades._fireRatePct||0)+15;SIM.upgrades._heatPerShotPct=(SIM.upgrades._heatPerShotPct||0)+15;SIM.upgrades.c_overclock=true;break;
+    case'c_bloodPact':SIM.bodyHpMax+=300;SIM.bodyHp+=300;SIM.upgrades._economyPct=(SIM.upgrades._economyPct||0)-15;SIM.upgrades.c_bloodPact=true;break;
+    case'c_riskyTurrets':
+      SIM.upgrades.riskyTurrets=true;
+      // Halve max HP on every turret already deployed (existing ones become
+      // exposed retroactively, not just future spawns), and clamp current
+      // HP so a full-health turret doesn't sit above its new cap.
+      for(const t of SIM.turrets){if(!t.corrupted){t.hpMax=Math.round(t.hpMax*0.5);t.hp=Math.min(t.hp,t.hpMax);}}
+      break;
+    case'c_forbiddenEnzyme':SIM.upgrades._dmgPct=(SIM.upgrades._dmgPct||0)+40;SIM.upgrades._dmgReducedPct=(SIM.upgrades._dmgReducedPct||0)-20;SIM.upgrades.c_forbiddenEnzyme=true;break;
+    case'c_desperateGambit':SIM.upgrades._economyPct=(SIM.upgrades._economyPct||0)+60;SIM.bodyHpMax=Math.round(SIM.bodyHpMax*0.75);SIM.bodyHp=Math.min(SIM.bodyHp,SIM.bodyHpMax);SIM.upgrades.c_desperateGambit=true;break;
   }
 }
 function repairWorstOrgan(){
@@ -338,7 +369,12 @@ function enterPersonalDrafts(){
   for(const p of SIM.players){
     if(!p._ownedPerks)p._ownedPerks={};
     const pool=PERSONAL_PERK_POOL.filter(o=>!o.cls||o.cls===p.cls);
-    const eligible=c=>!p._ownedPerks[c.id];
+    // Card-specific eligible() gate (e.g. p_dashDistance only makes sense
+    // for classes whose ability key is 'dash') is checked alongside the
+    // ownership check — every OTHER eligible() usage in this codebase
+    // (UPGRADE_POOL) is wired the same way, this pool just hadn't needed
+    // one until now.
+    const eligible=c=>!p._ownedPerks[c.id]&&(!c.eligible||c.eligible(p));
     const opts=drawDraftOptions(pool,eligible,3,makeEpFillerCard);
     SIM.personalDrafts[p.pid]={options:opts,picked:null};
   }
@@ -469,6 +505,41 @@ function applyPerk(p,id){
     case'p_bcell_reach':p._rangeBonus=(p._rangeBonus||0)+80;break;
     case'p_bcell_overheal':p._overhealPerk=true;break;
     case'p_bcell_martyr':p._martyrPerk=true;break;
+    // ---- more universal
+    case'p_ammoMax2':p.ammoMax=Math.round(p.ammoMax*1.15);p.ammo=Math.min(p.ammoMax,p.ammo+Math.round(p.ammoMax*0.15));break;
+    case'p_critChance':p._critBonus=(p._critBonus||0)+0.05;break;
+    case'p_reload':p._fireRateBonusPct=(p._fireRateBonusPct||0)+15;break;
+    case'p_organAware':p._organAwarePerk=true;break;
+    case'p_dashDistance':p._dashSpeedMult=(p._dashSpeedMult||1)*1.2;break;
+    case'p_heartGuard':p._heartGuardPerk=true;if(SIM.debuffs.heart)p.speed/=0.85;break;
+    case'p_overheal':p.hpMax=Math.round(p.hpMax*1.15);p.hp=Math.round(p.hp*1.15);break;
+    case'p_critShred':p._critShredPerk=true;break;
+    case'p_secondChance':p._secondChancePerk=true;break;
+    case'p_omnivore':p._personalEpPct=(p._personalEpPct||0)+0.2;break;
+    case'p_apexReflexes':p._fireRateBonusPct=(p._fireRateBonusPct||0)+15;p.speed*=1.15;break;
+    // ---- macrophage expansion
+    case'p_mac_secondwind':p._regenPct=(p._regenPct||0)+0.01;break;
+    case'p_mac_slam':p._slamPerk=true;break;
+    case'p_mac_ironhide':p._dmgTakenMult=(p._dmgTakenMult||1)*0.85;break;
+    // ---- tcell expansion
+    case'p_tcell_overcharge':p._durBonus=(p._durBonus||0)+1;break;
+    case'p_tcell_precision':p._odCritBonus=(p._odCritBonus||0)+0.08;break;
+    case'p_tcell_sustain':p._cdMult=(p._cdMult||1)*0.8;break;
+    // ---- bcell expansion
+    case'p_bcell_potent':p._healMult=(p._healMult||1)*1.2;break;
+    case'p_bcell_quickdose':p._cdMult=(p._cdMult||1)*0.8;break;
+    case'p_bcell_widecast':p._rangeBonus=(p._rangeBonus||0)+104;break;
+    // ---- nk expansion
+    case'p_nk_stealth':p._stealthSpeedPerk=true;break;
+    case'p_nk_followup':p._followupPerk=true;break;
+    case'p_nk_huntersinct':p._hunterInstinctPerk=true;break;
+    // ---- personal curses
+    case'c_p_recklessAim':p._fireRateBonusPct=(p._fireRateBonusPct||0)+20;p._spreadMult=(p._spreadMult||1)*1.15;break;
+    case'c_p_thinSkin':p.speed*=1.15;p.hpMax=Math.round(p.hpMax*0.9);p.hp=Math.min(p.hp,p.hpMax);break;
+    case'c_p_overdraw':p._pierceDmg=(p._pierceDmg||1)*1.3;p._cdMult=(p._cdMult||1)*1.2;break;
+    case'c_p_fragileFocus':p._critBonus=(p._critBonus||0)+0.25;p._dmgTakenMult=(p._dmgTakenMult||1)*1.25;break;
+    case'c_p_martyrsBargain':p._pierceDmg=(p._pierceDmg||1)*1.5;p._noHealPerk=true;break;
+    case'c_p_gluttony':p._personalEpPct=(p._personalEpPct||0)+0.6;p.hpMax=Math.round(p.hpMax*0.7);p.hp=Math.min(p.hp,p.hpMax);break;
   }
   ev({k:'perk',name:PERK_BY_ID[id].name,pid:p.pid});
 }
@@ -499,6 +570,33 @@ function applyEvolution(p,id){
     case'ev_dash_reset':p._dashResetPerk=true;break;
     case'ev_dash_chain':p._dashChainPerk=true;break;
     case'ev_dash_apex':p._dashApexPerk=true;break;
+    // ---- new shared commons
+    case'ev_taunt_uptime':p._durBonus=(p._durBonus||0)+1;p._cdMult=(p._cdMult||1)*0.9;break;
+    case'ev_od_windup':p._odInstantVentPerk=true;break;
+    case'ev_heal_selfamt':p._healSelfBonus=(p._healSelfBonus||0)+0.25;break;
+    case'ev_taunt_hp':p.hpMax=Math.round(p.hpMax*1.1);p.hp=Math.round(p.hp*1.1);break;
+    case'ev_od_heatcap':p._heatCapMult=(p._heatCapMult||1)*1.15;break;
+    case'ev_dash_windup':p._cdMult=(p._cdMult||1)*0.9;p._dashPreInvulnPerk=true;break;
+    case'ev_dash_ammo':p._dashAmmoRefund=(p._dashAmmoRefund||0)+2;break;
+    // ---- new branch elites (non-curse)
+    case'ev_taunt_regen':p._tauntHealPerk=true;break;
+    case'ev_taunt_reflect':p._tauntReflectPerk=true;break;
+    case'ev_taunt_wideraggro':p._rangeBonus=(p._rangeBonus||0)+96;p._tauntThornsPerk=true;break;
+    case'ev_od_critod':p._odCritBonus=(p._odCritBonus||0)+0.15;break;
+    case'ev_od_extend':p._odExtendPerk=true;break;
+    case'ev_heal_preshield':p._healShieldEvoPerk=true;p._shieldAmtMult=(p._shieldAmtMult||1)*1.2;break;
+    case'ev_heal_triplecharge':p._cdMult=(p._cdMult||1)*0.85;break;
+    case'ev_dash_wideslash':p._dashDmgPerk=true;p._dashHitRadiusMult=(p._dashHitRadiusMult||1)*1.6;break;
+    case'ev_dash_speedup':p._dashMomentumPerk=true;break;
+    // ---- evolution curses: strong buff, real per-player drawback
+    case'c_ev_taunt_fortress':p._tauntShieldPerk=true;p._tauntFortressCurse=true;p._cdMult=(p._cdMult||1)*2;break;
+    case'c_ev_taunt_provoke':p._tauntThornsPerk=true;p._tauntProvokeCurse=true;break;
+    case'c_ev_od_meltdown':p._odDmgPerk=true;p._odMeltdownCurse=true;break;
+    case'c_ev_od_addiction':p._cdMult=(p._cdMult||1)*0.65;p._odAddictionCurse=true;break;
+    case'c_ev_heal_fragileward':p._healShieldEvoPerk=true;p._healShieldBrittle=true;p._shieldAmtMult=(p._shieldAmtMult||1)*1.5;break;
+    case'c_ev_heal_burnout':p._healDoublePerk=true;p._healBurnoutCurse=true;break;
+    case'c_ev_dash_berserk':p._dashDmgPerk=true;p._dashBerserkCurse=true;break;
+    case'c_ev_dash_overextend':p._cdMult=(p._cdMult||1)*0.55;p._dashOverextendCurse=true;break;
   }
 }
 function endRun(reason){

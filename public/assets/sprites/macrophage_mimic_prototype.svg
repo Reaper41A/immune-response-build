@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="170" height="170" viewBox="-85 -85 170 170">
+  <defs>
+    <radialGradient id="mimicGradient" cx="35%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#e2e8ee"/>
+      <stop offset="58%" stop-color="#b9c4cf"/>
+      <stop offset="100%" stop-color="#5f6a75"/>
+    </radialGradient>
+    <radialGradient id="patchSheen" cx="35%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#eef3f7"/>
+      <stop offset="62%" stop-color="#c8d1d9"/>
+      <stop offset="100%" stop-color="#7b8792"/>
+    </radialGradient>
+    <filter id="auraBlur" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.8"/>
+    </filter>
+
+    <style>
+      /* Macrophage Mimic — REVEALED husk only (disguised state stays a
+         renderer-level player-color copy, per spec). Idle is deliberately
+         "off": uneven, less rhythmic than any other creature. Attack is
+         the lunge — body stretches toward travel direction. Death reads as
+         a fake shell cracking apart, not a living membrane bursting. */
+      #macrophageMimic{transform-origin:0 0}
+      #aura{animation:mimicAura 2.3s ease-in-out infinite}
+      #husk{transform-box:fill-box;transform-origin:center;animation:mimicUnsettled 2.7s ease-in-out infinite}
+      #core-glimpse{transform-box:fill-box;transform-origin:center;animation:mimicCorePulse 1.3s ease-in-out infinite}
+      #borrowed-patch{animation:mimicPatchSheen 3.6s ease-in-out infinite}
+      .damage-flash{opacity:0;pointer-events:none}
+
+      #macrophageMimic.state-hit #husk{animation:mimicHit .2s ease-out}
+      #macrophageMimic.state-hit #core-glimpse{animation:mimicCoreHit .2s ease-out}
+      #macrophageMimic.state-hit .damage-flash{animation:mimicFlash .2s ease-out}
+
+      #macrophageMimic.state-attack #husk{animation:mimicLunge .6s ease-in-out}
+      #macrophageMimic.state-attack #core-glimpse{animation:mimicCoreCharge .6s ease-in-out}
+
+      #macrophageMimic.state-critical #husk{animation:mimicCriticalUnsettled .5s ease-in-out infinite}
+      #macrophageMimic.state-critical #core-glimpse{animation:mimicCoreCritical .3s ease-in-out infinite}
+
+      #macrophageMimic.state-death #husk{animation:mimicCrack .6s ease-in forwards}
+      #macrophageMimic.state-death #borrowed-patch{animation:mimicPatchBreak .5s ease-in forwards}
+      #macrophageMimic.state-death #core-glimpse{animation:mimicCoreEscape .6s ease-in forwards}
+      #macrophageMimic.state-death #aura{animation:mimicFadeOut .4s ease-out forwards}
+
+      @keyframes mimicAura{0%,100%{opacity:.16;transform:scale(.96)}50%{opacity:.28;transform:scale(1.05)}}
+      @keyframes mimicUnsettled{0%,100%{transform:scale(1,1) rotate(0deg)}30%{transform:scale(1.02,.985) rotate(-.8deg)}55%{transform:scale(.99,1.015) rotate(.5deg)}80%{transform:scale(1.01,.995) rotate(-.3deg)}}
+      @keyframes mimicCorePulse{0%,100%{opacity:.75;transform:scale(.92)}50%{opacity:1;transform:scale(1.1)}}
+      @keyframes mimicPatchSheen{0%,100%{opacity:.85}50%{opacity:1}}
+      @keyframes mimicHit{0%{transform:scale(1)}35%{transform:translate(2px,-1px) scale(1.1,.86)}100%{transform:scale(1)}}
+      @keyframes mimicCoreHit{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+      @keyframes mimicFlash{0%,100%{opacity:0}22%{opacity:.9}}
+      @keyframes mimicLunge{0%{transform:scale(1)}40%{transform:scale(1.28,.82)}70%{transform:scale(.92,1.1)}100%{transform:scale(1)}}
+      @keyframes mimicCoreCharge{0%,100%{transform:scale(1);opacity:.88}50%{transform:scale(1.5);opacity:1}}
+      @keyframes mimicCriticalUnsettled{0%,100%{transform:scale(1,1)}50%{transform:scale(1.05,.94) rotate(1.5deg)}}
+      @keyframes mimicCoreCritical{0%,100%{opacity:.6;transform:scale(.85)}50%{opacity:1;transform:scale(1.3)}}
+      @keyframes mimicCrack{0%{transform:scale(1);opacity:1}40%{transform:scale(1.1,.9);opacity:1}100%{transform:scale(1.3,.4) rotate(6deg);opacity:0}}
+      @keyframes mimicPatchBreak{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.6) rotate(-20deg)}}
+      @keyframes mimicCoreEscape{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:translate(-8px,10px) scale(.2)}}
+      @keyframes mimicFadeOut{0%{opacity:1}100%{opacity:0}}
+    </style>
+  </defs>
+
+  <g id="macrophageMimic" transform-origin="0 0">
+    <path id="aura" d="M -48,-3 C -45,-30 -25,-47 2,-45 C 31,-44 48,-25 46,2 C 44,30 25,45 -2,47 C -29,48 -49,29 -48,-3 Z"
+      fill="#e2e8ee" opacity="0.18" filter="url(#auraBlur)"/>
+
+    <g id="husk" transform-box="fill-box" transform-origin="center">
+      <path id="husk-shape" d="M -31,-13 C -30,-29 -18,-39 -2,-38 C 12,-42 29,-32 34,-19 C 40,-4 35,12 25,22 C 18,31 4,35 -8,32 C -20,35 -32,24 -35,12 C -39,1 -35,-8 -31,-13 Z"
+        fill="url(#mimicGradient)"/>
+      <path id="husk-highlight" d="M -25,-17 C -20,-29 -9,-34 2,-33 C 10,-35 18,-30 23,-24 C 12,-27 1,-24 -7,-19 C -14,-15 -20,-12 -25,-17 Z"
+        fill="#f5f8fa" opacity="0.28" filter="url(#softBlur)"/>
+      <path id="husk-shadow" d="M -28,18 C -17,28 -5,29 5,25 C 15,28 24,20 29,12 C 24,28 11,36 -5,32 C -16,35 -27,28 -28,18 Z"
+        fill="#46515c" opacity="0.20"/>
+    </g>
+
+    <g id="borrowed-patch" transform-box="fill-box" transform-origin="center">
+      <path id="borrowed-patch-shape" d="M 7,-19 C 18,-21 27,-15 29,-6 C 31,4 24,13 14,14 C 4,15 -3,8 -3,-1 C -4,-10 -2,-17 7,-19 Z"
+        fill="url(#patchSheen)" opacity="0.88"/>
+      <path id="borrowed-patch-seam" d="M 7,-19 C 18,-21 27,-15 29,-6 C 31,4 24,13 14,14 C 4,15 -3,8 -3,-1 C -4,-10 -2,-17 7,-19 Z"
+        fill="none" stroke="#687581" stroke-width="1.2" opacity="0.52"/>
+      <path id="borrowed-patch-highlight" d="M 3,-12 C 9,-17 18,-17 23,-13 C 15,-13 8,-9 3,-5 Z"
+        fill="#ffffff" opacity="0.22"/>
+    </g>
+
+    <g id="core-glimpse" transform-box="fill-box" transform-origin="center">
+      <ellipse id="core-glimpse-shape" cx="0" cy="0" rx="6.5" ry="5.4" fill="#ff4d6d" opacity="0.88"/>
+      <ellipse id="core-glimpse-highlight" cx="-2" cy="-2" rx="2.2" ry="1.6" fill="#ffb0bd" opacity="0.55"/>
+    </g>
+
+    <path id="damage-flash" d="M -31,-13 C -30,-29 -18,-39 -2,-38 C 12,-42 29,-32 34,-19 C 40,-4 35,12 25,22 C 18,31 4,35 -8,32 C -20,35 -32,24 -35,12 C -39,1 -35,-8 -31,-13 Z"
+      fill="#ffffff" opacity="0"/>
+  </g>
+</svg>

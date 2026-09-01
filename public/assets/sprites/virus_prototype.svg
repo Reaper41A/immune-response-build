@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="170" height="170" viewBox="-85 -85 170 170">
+<defs>
+<radialGradient id="capsid"><stop stop-color="#FFB0C1"/><stop offset=".55" stop-color="#FF4D6D"/><stop offset="1" stop-color="#A5103B"/></radialGradient>
+<radialGradient id="core"><stop stop-color="#FFF8B0"/><stop offset=".5" stop-color="#FFD166"/><stop offset="1" stop-color="#D94D20"/></radialGradient>
+<linearGradient id="spike"><stop stop-color="#8EF6FF"/><stop offset="1" stop-color="#4267FF"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+<filter id="coreGlow"><feGaussianBlur stdDeviation="1.5"/></filter>
+<style>
+#virus{transform-origin:0 0} #aura{animation:aura 1.1s ease-in-out infinite}
+#capsid{transform-box:fill-box;transform-origin:center;animation:breathe 1.4s ease-in-out infinite}
+#core{transform-box:fill-box;transform-origin:center;animation:spin 2.1s linear infinite}
+#genome{transform-box:fill-box;transform-origin:center;animation:float 1.3s ease-in-out infinite}
+#spike-ring{transform-box:fill-box;transform-origin:center;animation:spin 5s linear infinite}
+.spike{transform-box:fill-box;transform-origin:center;animation:throb 1.7s ease-in-out infinite}
+#virus.state-hit #capsid{animation:hit .2s ease-out}
+#virus.state-hit #core{animation:corehit .22s ease-out}
+#virus.state-hit #damage{animation:flash .2s ease-out}
+#virus.state-attack #spike-ring{animation:attack .55s ease-in-out}
+#virus.state-attack #core{animation:charge .55s ease-in-out}
+#virus.state-critical #capsid{animation:critical .42s ease-in-out infinite}
+#virus.state-critical #core{animation:criticalcore .3s ease-in-out infinite}
+#virus.state-death{animation:death .72s ease-in forwards}
+#virus.state-death #capsid{animation:rupture .72s ease-in forwards}
+#virus.state-death #core{animation:escape .72s ease-in forwards}
+#virus.state-death #spike-ring{animation:explode .72s ease-in forwards}
+@keyframes aura{0%,100%{opacity:.15;transform:scale(.94)}50%{opacity:.34;transform:scale(1.08)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035,.965)}}
+@keyframes spin{to{transform:rotate(360deg)}} @keyframes float{50%{transform:translate(2px,-2px) rotate(8deg)}}
+@keyframes throb{50%{transform:scale(1.12)}} @keyframes hit{35%{transform:translate(3px,-1px) scale(1.14,.84)}}
+@keyframes corehit{50%{transform:scale(1.3)}} @keyframes flash{0%,100%{opacity:0}20%{opacity:.9}}
+@keyframes attack{50%{transform:scale(1.18) rotate(18deg)}to{transform:scale(1) rotate(36deg)}}
+@keyframes charge{50%{transform:scale(1.45)}} @keyframes critical{50%{transform:scale(1.07,.93)}}
+@keyframes criticalcore{50%{transform:scale(1.35);opacity:1}}
+@keyframes death{55%{transform:scale(1.16,.82) rotate(12deg)}100%{transform:scale(.08) rotate(50deg);opacity:0}}
+@keyframes rupture{55%{transform:scale(1.2,.82)}100%{transform:scale(1.45,.3);opacity:0}}
+@keyframes escape{100%{transform:translate(25px,-19px) scale(.35);opacity:0}}
+@keyframes explode{100%{transform:scale(1.7) rotate(70deg);opacity:0}}
+</style>
+</defs>
+<g id="virus">
+<circle id="aura" cx="0" cy="0" r="43" fill="#FF4D6D" filter="url(#glow)"/>
+<g id="spike-ring" fill="url(#spike)" stroke="#B6FAFF" stroke-width="1">
+<path class="spike" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(45)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(90)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(135)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(180)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(225)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(270)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/><path class="spike" transform="rotate(315)" d="M0,-28 L-5,-47 L0,-59 L5,-47 Z"/>
+</g>
+<g id="capsid">
+<circle cx="0" cy="0" r="35" fill="url(#capsid)" stroke="#FFD1DB" stroke-width="2"/>
+<circle cx="0" cy="0" r="29" fill="none" stroke="#9D173E" stroke-width="2" opacity=".65"/>
+<path d="M-20,-20 Q-5,-34 13,-25" fill="none" stroke="#FFF0F5" stroke-width="4" stroke-linecap="round" opacity=".5"/>
+<circle cx="-25" cy="3" r="2" fill="#FFCFDA"/><circle cx="22" cy="-7" r="1.8" fill="#FFCFDA"/>
+</g>
+<g id="interior">
+<circle cx="0" cy="0" r="18" fill="#FFD166" opacity=".2" filter="url(#coreGlow)"/>
+<g id="core"><circle cx="0" cy="0" r="13" fill="url(#core)" stroke="#FFF1A1" stroke-width="1.5"/>
+<path id="genome" d="M-7,-3 C-3,-10 3,10 7,3 C10,-3 3,-7 0,0 C-3,7 -10,3 -7,-3" fill="none" stroke="#7A3EFF" stroke-width="2.7" stroke-linecap="round"/>
+<circle cx="0" cy="0" r="3" fill="#FFF9D2"/></g>
+<g id="genetic-particles" fill="#63E6FF"><circle cx="20" cy="2" r="2.2"/><circle cx="-18" cy="-7" r="1.8"/><circle cx="8" cy="20" r="1.6"/><circle cx="-8" cy="-20" r="1.5"/></g>
+</g>
+<circle id="damage" cx="0" cy="0" r="34" fill="#FFF" opacity="0"/>
+<g id="surface-nodes" fill="#67E8FF"><circle id="node-1" cx="-12" cy="-27" r="2"/><circle id="node-2" cx="26" cy="8" r="2.4"/><circle id="node-3" cx="-23" cy="17" r="1.7"/><circle id="node-4" cx="5" cy="28" r="1.8"/></g>
+</g></svg>

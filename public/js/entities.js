@@ -5,10 +5,25 @@
 
 function drawEnemies(view){
   const t=performance.now()/1000;
+  // svgEntities (High/Ultra) draws an animated sprite ON TOP of whatever
+  // this function draws for the same entity — so at those tiers the BODY
+  // shape drawn here is pure redundant fill-rate, paid every frame for
+  // every enemy, for pixels nothing ever sees (fully occluded by the SVG
+  // layer, which sizes/positions itself identically — see svgFX.js
+  // worldToScreen). skipBody below turns that body draw off while leaving
+  // every overlay (glow halo, hp bar, elite ring, taunt ring, boss label)
+  // drawing exactly as before — those are NOT reproduced by the sprites in
+  // svgFX.js's ENEMY_SPRITES map, so they must keep drawing regardless of
+  // tier. Only entities svgFX.js actually has a mapped sprite for AND has a
+  // ready pooled instance for get skipped — a still-loading or unmapped
+  // (boss/worm/mimic) entity always keeps its canvas body so nothing ever
+  // goes invisible for a frame while a sprite fetch is in flight.
+  const skipBody=Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyEnemy;
   for(const en of view.enemies||[]){
     const def=ENEMY_DEFS[en.d]||BOSS_DEFS[en.d]||{color:'#fff',glow:'#fff',radius:12,name:'?'};
+    const bodyDrawn=!(skipBody&&SvgFX.hasReadyEnemy(en));
     // worm body chain (position history is tracked per-frame in finalizeView)
-    if(en.wseg){
+    if(en.wseg&&bodyDrawn){
       for(let i=en.wseg.length-1;i>=1;i--){
         const s=en.wseg[i];
         const rr=Math.max(3,def.radius*(1-i*0.09));
@@ -20,6 +35,7 @@ function drawEnemies(view){
     }
     // Mimic in disguise renders as a PLAYER of its victim's color — that is
     // the entire point (Phase 1 ruling). Revealed form is a pale husk.
+    // Never sprite-backed (unmapped in ENEMY_SPRITES), so always drawn.
     if(en.mg===1&&en.dp){
       const victim=(view.players||[]).find(p=>p.i===en.dp);
       drawMimicDisguised(en,t,victim);
@@ -31,11 +47,21 @@ function drawEnemies(view){
     if(en.cl)alpha=0.35;
     if(en.mg===3)alpha=0.5+Math.abs(Math.sin(t*30))*0.4; // telegraph flicker
     const gr=en.hm>500?def.radius*2.6:def.radius*2.2;
-    blitGlow(glowSprite(def.glow,Math.ceil(gr)),0,0,alpha*0.32);
+    blitGlow(glowSprite(def.glow,Math.ceil(gr)),0,0,alpha*0.32); // glow halo: not reproduced by the SVG sprite, always drawn
     ctx.globalAlpha=alpha;
 
     const flash=en.tf>0?en.tf/0.15:0;
     ctx.fillStyle=flash>0?`rgba(255,255,255,${0.55+flash*0.45})`:def.color;
+    if(!bodyDrawn){
+      // sprite owns the body; overlays (elite ring/taunt/parasite aura in
+      // local coords, then hp bar/boss label in world coords) still need
+      // drawing — same two calls as the normal path below, just without
+      // the switch-statement shape draw in between.
+      drawEnemyLocalOverlays(en,def);
+      ctx.restore();
+      drawEnemyWorldOverlays(en,def);
+      continue;
+    }
     switch(en.d){
       case'bacteria':blobPath(def.radius,t*3.3+en.i);break;
       case'virus':spikyPath(def.radius,8,t*5+en.i);break;
@@ -93,38 +119,46 @@ function drawEnemies(view){
         shade3D(ctx,def.radius);
     }
 
-    // elite ring + glyph
-    if(en.el){
-      const ec={armor:'#c9c9c9',speed:'#ffd166',shield:'#7fd6ff',regen:'#8fe36a'}[en.el]||'#fff';
-      ctx.strokeStyle=ec;ctx.lineWidth=2.5;
-      ctx.beginPath();ctx.arc(0,0,def.radius+4,0,Math.PI*2);ctx.stroke();
-      ctx.fillStyle=ec;
-      ctx.font='bold 9px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
-      ctx.fillText({armor:'A',speed:'S',shield:'S+',regen:'R'}[en.el]||'',0,-def.radius-8);
-    }
-    // taunt ring
-    if(en.tb){ctx.strokeStyle='rgba(127,214,255,0.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,def.radius+7,0,Math.PI*2);ctx.stroke();}
-    // parasite aura tether hint
-    if(en.d==='parasite'){
-      ctx.strokeStyle='rgba(255,159,90,0.25)';ctx.lineWidth=1.5;
-      ctx.beginPath();ctx.arc(0,0,140,0,Math.PI*2);ctx.stroke();
-    }
+    // elite ring + glyph, taunt ring, parasite aura hint — local coords
+    drawEnemyLocalOverlays(en,def);
     ctx.restore();
 
-    // hp bar (tanky units only — trash dies fast enough not to need one)
-    if(!isBossDef(en.d)&&en.hm>40){
-      const w=en.hm>400?60:30;
-      const pct=clamp(en.hp/en.hm,0,1);
-      ctx.fillStyle='rgba(0,0,0,0.45)';
-      ctx.fillRect(en.x-w/2,en.y-def.radius-14,w,4);
-      ctx.fillStyle=pct>0.5?'#8fe36a':pct>0.25?'#ffd166':'#ff4d6d';
-      ctx.fillRect(en.x-w/2,en.y-def.radius-14,w*pct,4);
-    }
-    if(isBossDef(en.d)){
-      ctx.fillStyle='#ffb3c0';
-      ctx.font='bold 11px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
-      ctx.fillText(def.name.toUpperCase(),en.x,en.y-def.radius-16);
-    }
+    drawEnemyWorldOverlays(en,def);
+  }
+}
+function drawEnemyLocalOverlays(en,def){
+  // elite ring + glyph
+  if(en.el){
+    const ec={armor:'#c9c9c9',speed:'#ffd166',shield:'#7fd6ff',regen:'#8fe36a'}[en.el]||'#fff';
+    ctx.strokeStyle=ec;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(0,0,def.radius+4,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=ec;
+    ctx.font='bold 9px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
+    ctx.fillText({armor:'A',speed:'S',shield:'S+',regen:'R'}[en.el]||'',0,-def.radius-8);
+  }
+  // taunt ring
+  if(en.tb){ctx.strokeStyle='rgba(127,214,255,0.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,def.radius+7,0,Math.PI*2);ctx.stroke();}
+  // parasite aura tether hint
+  if(en.d==='parasite'){
+    ctx.strokeStyle='rgba(255,159,90,0.25)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(0,0,140,0,Math.PI*2);ctx.stroke();
+  }
+}
+function drawEnemyWorldOverlays(en,def){
+
+  // hp bar (tanky units only — trash dies fast enough not to need one)
+  if(!isBossDef(en.d)&&en.hm>40){
+    const w=en.hm>400?60:30;
+    const pct=clamp(en.hp/en.hm,0,1);
+    ctx.fillStyle='rgba(0,0,0,0.45)';
+    ctx.fillRect(en.x-w/2,en.y-def.radius-14,w,4);
+    ctx.fillStyle=pct>0.5?'#8fe36a':pct>0.25?'#ffd166':'#ff4d6d';
+    ctx.fillRect(en.x-w/2,en.y-def.radius-14,w*pct,4);
+  }
+  if(isBossDef(en.d)){
+    ctx.fillStyle='#ffb3c0';
+    ctx.font='bold 11px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
+    ctx.fillText(def.name.toUpperCase(),en.x,en.y-def.radius-16);
   }
 }
 function isBossDef(d){return d==='megaVirus'||d==='mutatedFungus'||d==='parasiteQueen';}
@@ -225,6 +259,14 @@ function roundRect(x,y,w,h,r){
 const YOU_COLOR='#ff3ec8'; // Phase 3 audit fix — unique vs every class/enemy
 function drawPlayers(view,firingRingFor){
   const t=performance.now()/1000;
+  // Same reasoning as drawEnemies' skipBody: at High/Ultra the SVG sprite
+  // sits on top of the canvas body and fully occludes it, so once a
+  // player's sprite instance is ready, drawing the canvas body circle is
+  // pure redundant fill-rate. YOU-ring, overdrive-aura ring, facing nub,
+  // name/chevron, and mini-hp-bar are NOT reproduced by the sprite (each
+  // player sprite's ability-active state covers the ability moment, not
+  // these constant HUD-ish overlays) so those keep drawing unconditionally.
+  const skipBody=Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyPlayer;
   for(const p of view.players||[]){
     const cls=CLASSES[p.c]||CLASSES.tcell;
     if(!p.a){
@@ -272,26 +314,35 @@ function drawPlayers(view,firingRingFor){
     ctx.save();
     ctx.translate(p.x,p.y);
     const baseA=view.invulnHint===p.i?0.6+Math.sin(performance.now()/40)*0.3:1;
-    blitGlow(glowSprite(p.col,34),0,0,baseA*0.3);
+    blitGlow(glowSprite(p.col,34),0,0,baseA*0.3); // glow halo: not reproduced by the sprite, always drawn
     ctx.globalAlpha=baseA;
 
-    // YOU ring — magenta, pulsing, ONLY on the local player
+    // YOU ring — magenta, pulsing, ONLY on the local player. Not
+    // reproduced by any player sprite (it's a meta/HUD cue, not part of
+    // the character), so always drawn regardless of body skip.
     if(p.i===App.myPid){
       ctx.strokeStyle='rgba(255,62,200,0.92)';
       ctx.lineWidth=2.5;
       const pulse=1+(REDUCED?0:Math.sin(t*4)*0.07);
       ctx.beginPath();ctx.arc(0,0,22*pulse,0,Math.PI*2);ctx.stroke();
     }
-    ctx.fillStyle=p.col;
-    ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
-    shade3D(ctx,14,{hiAlpha:0.6});
-    ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':'rgba(255,255,255,0.65)';
-    ctx.lineWidth=1.5;ctx.stroke();
-    // facing nub
-    ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(0,0);
-    ctx.lineTo(Math.cos(p.f||0)*21,Math.sin(p.f||0)*21);ctx.stroke();
-    // overdrive aura
+    const bodyDrawn=!(skipBody&&SvgFX.hasReadyPlayer(p));
+    if(bodyDrawn){
+      ctx.fillStyle=p.col;
+      ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
+      shade3D(ctx,14,{hiAlpha:0.6});
+      ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':'rgba(255,255,255,0.65)';
+      ctx.lineWidth=1.5;ctx.stroke();
+      // facing nub
+      ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(p.f||0)*21,Math.sin(p.f||0)*21);ctx.stroke();
+    }
+    // overdrive aura — the sprite's own ability-active state covers the
+    // ability's INTERNAL animation (pseudopods/receptors/antibodies/dash
+    // streaks per-class), but none of the four sprites draw this specific
+    // ring, so it's kept as its own always-on layer rather than assumed
+    // covered by ability-active.
     if(p.aa>0){
       ctx.strokeStyle='rgba(62,232,200,0.7)';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(0,0,19+Math.sin(t*10)*2,0,Math.PI*2);ctx.stroke();

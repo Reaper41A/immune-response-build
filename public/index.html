@@ -84,6 +84,9 @@ html,body{height:100vh;height:100svh;height:100dvh;}
 #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
   width:100vw;height:100vh;height:100svh;height:100dvh;}
 #gameWrap{position:relative;width:100%;height:100%;max-width:2400px;max-height:1400px;}
+#svgLayer{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;}
+#svgLayer .svgSprite{position:absolute;left:0;top:0;pointer-events:none;transform-origin:0 0;will-change:transform;}
+#svgLayer .svgSprite svg{display:block;overflow:visible;}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 
 /* ======================================================================
@@ -824,6 +827,23 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   0%,100%{box-shadow:0 0 16px -9px var(--oc);}
   50%{box-shadow:0 0 26px -6px var(--oc);}
 }
+/* Curses: a distinct 5th visual tier, not just a recolored rarity. Dashed
+   border (vs. everything else's solid) reads as "unstable/risky" at a
+   glance, and the skull badge in the name row (see renderDraftList) makes
+   the risk/reward framing obvious before the person reads the desc text. */
+.upgrade-card.cursed{
+  background:color-mix(in srgb,var(--oc) 10%,rgba(255,255,255,.03));
+  border-left-style:dashed;
+}
+.upgrade-card.curse-severe{
+  border-left-width:4px;
+  animation:curseFlicker 1.8s ease-in-out infinite;
+}
+@keyframes curseFlicker{
+  0%,100%{box-shadow:0 0 14px -8px var(--oc);}
+  50%{box-shadow:0 0 24px -5px var(--oc);}
+}
+.rarity-badge.cursed{letter-spacing:.08em;}
 .votes-row{position:absolute;bottom:6px;right:14px;display:flex;gap:3px;align-items:center;}
 .vote-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 5px currentColor;}
 .vote-label{font-family:var(--font-mono);font-size:8px;color:var(--dim);margin-right:2px;}
@@ -1139,6 +1159,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <div id="app">
 <div id="gameWrap">
   <canvas id="gameCanvas"></canvas>
+
+  <!-- SVG animation overlay: pooled, positioned DOM sprites synced every
+       frame to sim/view state by svgFX.js. Sits above the canvas (so
+       animated entities render over the painted background/trails/hazards)
+       and below the vignettes (so full-screen hurt/heal/low-hp flashes
+       still read on top of everything, matching the old canvas-only
+       behavior). pointer-events:none throughout — this layer is purely
+       visual and must never intercept input the canvas/HUD relies on. -->
+  <div id="svgLayer" aria-hidden="true"></div>
 
   <!-- vignettes -->
   <div class="vignette" id="vignetteHurt"></div>
@@ -1470,6 +1499,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <script src="js/enemies.js"></script>
 <script src="js/netcode.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/svgFX.js"></script>
 <script src="js/render.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/bestiary.js"></script>

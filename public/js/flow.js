@@ -110,10 +110,12 @@ function updateHumanPlayer(p,dt){
     p.x+=p.dashVX*dt;p.y+=p.dashVY*dt;
     p.dashVX*=Math.pow(0.02,dt);p.dashVY*=Math.pow(0.02,dt);
     if(p._dashDmg){
+      const hitR=(p.radius)*(p._dashHitRadiusMult||1);
+      const dashDmgMult=p._dashBerserkCurse?1.8:1;
       for(const en of SIM.enemies){
         if(!en.alive)continue;
-        if(dist2(p.x,p.y,en.x,en.y)<(p.radius+en.radius)*(p.radius+en.radius)){
-          damageEnemy(en,WEAPONS[p.weapon].dmg*2.6*squadDamageMult(p),{shooterPid:p.pid});
+        if(dist2(p.x,p.y,en.x,en.y)<(hitR+en.radius)*(hitR+en.radius)){
+          damageEnemy(en,WEAPONS[p.weapon].dmg*2.6*dashDmgMult*squadDamageMult(p),{shooterPid:p.pid});
         }
       }
     }
@@ -245,7 +247,8 @@ function simUpdate(dt){
   // respawns
   for(const p of SIM.players){
     if(p.alive)continue;
-    p.respawnTimer-=dt;
+    const respawnMult=1-(SIM.upgrades._reviveSpeedPct||0)/100;
+    p.respawnTimer-=dt/respawnMult;
     if(p.respawnTimer<=0){
       p.alive=true;p.hp=p.hpMax;p.invuln=1.2;p.heat=0;p.overheated=false;p.overheatTimer=0;
       ev({k:'respawn',x:p.x,y:p.y,pid:p.pid,name:p.name,color:p.color});
@@ -300,7 +303,7 @@ function simUpdate(dt){
     for(const en of SIM.enemies){
       if(!en.alive||en.defKey==='spore')continue;
       if(dist2(p.x,p.y,en.x,en.y)<(p.radius+en.radius)*(p.radius+en.radius)){
-        damagePlayer(p,en.dmg*0.3,'contact');
+        damagePlayer(p,en.dmg*0.3,en);
         p.meleeCd=0.5;
         break;
       }
@@ -309,7 +312,10 @@ function simUpdate(dt){
 
   // turrets — Turret Overclock (epic) speeds up every turret's cadence;
   // heavy sentries from Last Line of Defense (legendary) hit twice as hard.
+  // Corrupted turrets (Unstable Turret Cores curse) are excluded here —
+  // they no longer fight for the squad, see updateCorruptedTurrets below.
   for(const t of SIM.turrets){
+    if(t.corrupted)continue;
     t.cd-=dt;
     if(t.cd<=0){
       let target=null,bd=Infinity;
@@ -321,6 +327,7 @@ function simUpdate(dt){
       if(target){t.cd=SIM.upgrades.secondTurretRow?0.26:0.4;turretFire(t,target,t.heavy?2:1);}
     }
   }
+  updateCorruptedTurrets(dt);
 
   updateEnemies(dt);
 
