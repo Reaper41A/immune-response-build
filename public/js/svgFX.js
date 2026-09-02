@@ -79,6 +79,67 @@ const SvgFX=(()=>{
   };
   const SPRITE_BASE='assets/sprites/';
 
+  /* -------------------------------------------------------- sprite scaling
+     Every prototype sprite is authored on its own oversized centered
+     viewBox (e.g. macrophage_player-1.svg is viewBox="-95 -95 190 190", a
+     190px-wide asset for a class whose canvas radius is 14px — same story
+     for every enemy: bacteria_prototype.svg is 160px wide for an 11px-radius
+     bacterium). That native half-width is NOT the entity's gameplay radius,
+     so scale can never be left at 1 — each sprite needs its own
+     nativeHalf→gameRadius ratio, exactly like syncCore already does for the
+     Body (coreRadius()/220, 220 being body_core.svg's own half-width).
+     spriteHalf below is read straight from each file's viewBox (half of the
+     viewBox width) and is the divisor `setTransform` uses to normalize. */
+  const SPRITE_HALF={
+    // enemies — value = half the sprite's own viewBox width, read directly
+    // from each file (verified against every file in assets/sprites/)
+    'bacteria_prototype.svg':80,
+    'virus_prototype.svg':85,
+    'fungi_prototype.svg':85,
+    'antigen_cluster_prototype.svg':105,
+    'worm_seg_prototype.svg':80,
+    'toxin_sac_prototype.svg':75,
+    'biofilm_wall_prototype.svg':95,
+    'mycovirus_prototype.svg':75,
+    'macrophage_mimic_prototype.svg':85,
+    'prion_prototype.svg':105,
+    'necrotic_drifter_prototype.svg':75,
+    'storm_cloud_prototype.svg':85,
+    'retrovirus.svg':90,
+    'parasite.svg':150,
+    'spore.svg':60,
+    'mega_virus_boss.svg':240,
+    'mutated_fungus_boss.svg':235,
+    'parasite_queen_boss.svg':235,
+    // players
+    'macrophage_player-1.svg':95,
+    'tcell_player-1.svg':90,
+    'bcell_player.svg':90,
+    'natural_killer_player.svg':95,
+    // misc
+    'pickup.svg':24,
+    'turret.svg':32,
+    'acid_cloud_hazard.svg':90,
+  };
+  /* Fallback: for any sprite whose half-width wasn't hand-verified above,
+     read it directly off the loaded template's own viewBox the first time
+     that template resolves, so a wrong/missing entry here can never produce
+     a mis-sized sprite — the actual file is always the source of truth. */
+  function spriteHalfFor(file,svgEl){
+    let h=SPRITE_HALF[file];
+    if(h!=null)return h;
+    if(svgEl){
+      const vb=svgEl.getAttribute('viewBox');
+      if(vb){
+        const parts=vb.trim().split(/\s+/).map(Number);
+        if(parts.length===4&&parts[2]>0){h=parts[2]/2;SPRITE_HALF[file]=h;return h;}
+      }
+      const w=parseFloat(svgEl.getAttribute('width'));
+      if(w>0){h=w/2;SPRITE_HALF[file]=h;return h;}
+    }
+    return 40; // last-resort default so a totally malformed sprite still degrades to *some* finite size instead of NaN
+  }
+
   /* ------------------------------------------------------------- sprite cache
      Each sprite file is fetched + parsed ONCE, then every instance we need
      is a cheap cloneNode(true) of the cached template. */
@@ -122,7 +183,7 @@ const SvgFX=(()=>{
   let coreInstance=null;
 
   function makeInstance(kind,spriteInfo,opts){
-    const inst={kind,root:null,svg:null,el:null,ready:false,failed:false,lastSeen:0,extra:{}};
+    const inst={kind,root:null,svg:null,el:null,ready:false,failed:false,lastSeen:0,extra:{},spriteFile:spriteInfo&&spriteInfo.file};
     if(!spriteInfo){inst.ready=true;return inst;} // callers without a sprite file (shouldn't happen) degrade silently
     loadTemplate(spriteInfo.file).then(svg=>{
       if(!svg){inst.ready=true;inst.failed=true;return;} // load/parse failed — mark settled so callers (e.g. spawnDeathGhost's poll) stop waiting instead of looping forever
@@ -161,12 +222,40 @@ const SvgFX=(()=>{
   function worldToScreen(x,y){
     return{x:vOffX+x*vScale,y:vOffY+y*vScale};
   }
-  function setTransform(inst,x,y,rotRad,scale){
+  /* `scale` here is a GAME-WORLD RADIUS (e.g. def.radius=11 for bacteria,
+     14 for any player class, coreRadius() for the Body), matching exactly
+     what render.js's canvas arcs are drawn at — NOT a raw multiplier on the
+     sprite's native pixel size. Every sprite file is authored on its own
+     oversized centered viewBox (verified per-file: bacteria_prototype.svg
+     is a 160px-wide asset for an 11px-radius bacterium, macrophage_player-1
+     is 190px wide for a 14px-radius player, etc. — see SPRITE_HALF above),
+     so the sprite's own native half-width has to be divided out before
+     vScale is applied, exactly the way syncCore already normalizes by
+     dividing coreRadius() by body_core.svg's own 220 half-width. Skipping
+     that division (passing scale straight through as a bare multiplier) is
+     what previously rendered every sprite at ~6-13x its canvas counterpart.
+     Callers that pass no `scale` fall back to 1 world-unit — effectively a
+     1px radius — which would be a barely-visible speck, so every call site
+     below now always passes the entity's real def.radius/coreRadius(). */
+  function setTransform(inst,x,y,rotRad,worldRadius){
     if(!inst.el)return;
     const p=worldToScreen(x,y);
-    const s=(scale==null?1:scale)*vScale;
+    const half=spriteHalfFor(inst.spriteFile,inst.svg)||40;
+    const r=worldRadius==null?half:worldRadius; // no radius given → render at the sprite's own native size (1:1), never a bare raw multiplier
+    const s=(r/half)*vScale;
     const rot=rotRad?(rotRad*180/Math.PI):0;
-    inst.el.style.transform=`translate(${p.x}px,${p.y}px) rotate(${rot}deg) scale(${s})`;
+    // transform-origin is left at the DOM default (top-left, see
+    // #svgLayer .svgSprite in index.html) but the sprite's own <svg> is
+    // authored around ITS OWN (0,0) center, not the wrapper div's (0,0)
+    // corner — so translating the wrapper straight to the entity's screen
+    // point puts the div's top-left corner there, not the sprite's visual
+    // center, shifting every sprite down-right by roughly half its own
+    // width/height (and dragging everything toward the bottom-right,
+    // which is why sprites appeared to clump/overlap near the Body). The
+    // fix is a second, unscaled translate by (-half,-half) BEFORE the
+    // scale/rotate, so the sprite's local center lands exactly on
+    // translate(p.x,p.y) regardless of that sprite's native size.
+    inst.el.style.transform=`translate(${p.x}px,${p.y}px) rotate(${rot}deg) scale(${s}) translate(${-half}px,${-half}px)`;
   }
   function setClass(inst,name,on){
     if(!inst.root)return;
@@ -459,11 +548,17 @@ const SvgFX=(()=>{
       inst.lastSeen=t;
       if(!inst.ready||!inst.el)continue;
 
+      // Real gameplay radius for this enemy (same lookup drawEnemies uses),
+      // so the sprite is scaled to match its canvas-drawn hitbox instead of
+      // rendering at the sprite file's own oversized native pixel size.
+      const def=ENEMY_DEFS[en.d]||BOSS_DEFS[en.d];
+      const gameRadius=def?def.radius:12;
+
       // worm segments position themselves from wseg history rather than a
       // single x/y — CSS only owns rotation/scale for these (see
       // worm_seg_prototype.svg's own comment), so translate is JS-owned here.
       if(en.d==='worm_seg'&&en.wseg&&en.wseg.length){
-        setTransform(inst,en.wseg[0].x,en.wseg[0].y,0,1);
+        setTransform(inst,en.wseg[0].x,en.wseg[0].y,0,gameRadius);
         const segIds=['seg-head','seg-2','seg-3','seg-4','seg-tail'];
         for(let i=0;i<segIds.length;i++){
           const segEl=inst.svg&&inst.svg.getElementById(segIds[i]);
@@ -474,7 +569,7 @@ const SvgFX=(()=>{
           segEl.style.transform=`translate(${(p1.x-p0.x)/vScale}px,${(p1.y-p0.y)/vScale}px)`;
         }
       }else{
-        setTransform(inst,en.x,en.y,0,1);
+        setTransform(inst,en.x,en.y,0,gameRadius);
       }
 
       // No velocity field exists on the view's enemy entries (buildHostView
@@ -556,7 +651,10 @@ const SvgFX=(()=>{
       inst.lastSeen=t;
       if(!inst.ready||!inst.el)continue;
 
-      setTransform(inst,p.x,p.y,0,1);
+      // 14 = the fixed player-body radius drawPlayers draws every class at
+      // in entities.js (ctx.arc(0,0,14,...)) — same value for all 4 classes,
+      // so unlike enemies there's no per-class def.radius to look up.
+      setTransform(inst,p.x,p.y,0,14);
       const facing=inst.svg&&inst.svg.getElementById('facing-indicator');
       if(facing)facing.style.transform=`rotate(${(p.f||0)*180/Math.PI}deg)`;
 
@@ -587,7 +685,8 @@ const SvgFX=(()=>{
       if(!inst){inst=makeInstance('pickup',{file:'pickup.svg',root:'pickup'});pickupPool.set(key,inst);}
       inst.lastSeen=t;
       if(!inst.ready||!inst.el)continue;
-      setTransform(inst,pk.x,pk.y,0,1);
+      // 5 = pickup's canvas radius (drawPickups: ctx.arc(pk.x,pk.y+bob,5,...))
+      setTransform(inst,pk.x,pk.y,0,5);
       if(isNew){
         setClass(inst,'spawning',true);
         setTimeout(()=>setClass(inst,'spawning',false),400);
@@ -620,7 +719,10 @@ const SvgFX=(()=>{
       if(!inst){inst=makeInstance('turret',{file:'turret.svg',root:'turret'});turretPool.set(key,inst);}
       inst.lastSeen=t;
       if(!inst.ready||!inst.el)continue;
-      setTransform(inst,tu.x,tu.y,0,1);
+      // 9 = turret's canvas body radius (drawTurrets: ctx.arc(t.x,t.y,9,...)
+      // for the normal state; corrupted uses 10, close enough to share one
+      // constant rather than branch on tu.corrupted for a 1px difference)
+      setTransform(inst,tu.x,tu.y,0,9);
       setClass(inst,'corrupted',!!tu.corrupted);
     }
     for(const [key,inst] of turretPool){
@@ -641,7 +743,7 @@ const SvgFX=(()=>{
       inst.lastSeen=t;
       if(!inst.ready||!inst.el)continue;
       const R=hz.r||hz.radius||56;
-      setTransform(inst,hz.x,hz.y,0,R/56); // 56 = the hazard's designed base radius (matches drawHazards' own glow sprite sizing)
+      setTransform(inst,hz.x,hz.y,0,R); // R is already a real world radius — setTransform itself now normalizes against acid_cloud_hazard.svg's own native half-width (see SPRITE_HALF), so no pre-division needed here
       setVar(inst,'--life-frac',String(hz.l!=null?Math.max(0,Math.min(1,hz.l/1.8)):1));
       if(isNew){
         setClass(inst,'spawning',true);
@@ -659,7 +761,7 @@ const SvgFX=(()=>{
     const inst=coreInstance;
     if(!inst.ready||!inst.el)return;
     const c=worldCore();
-    setTransform(inst,c.x,c.y,0,coreRadius()/220); // 220 = body_core.svg's own designed half-width (viewBox -220..220)
+    setTransform(inst,c.x,c.y,0,coreRadius()); // coreRadius() is a real world radius — setTransform normalizes against body_core.svg's own 220 half-width itself now, so no pre-division needed here
     const pct=view.bodyHpMax>0?view.bodyHp/view.bodyHpMax:1;
     setClass(inst,'critical',pct<=0.3);
     // health-tissue color lerp + sickness-texture opacity: driven continuously
@@ -697,7 +799,14 @@ const SvgFX=(()=>{
         if(i>=0)ghostPool.splice(i,1);
       };
       if(inst.failed||!inst.el){cleanup();return;} // sprite failed to load — nothing to animate, just drop the pooled entry
-      setTransform(inst,x,y,0,evData.scale||1);
+      // evData.scale is a boss-size MULTIPLIER (combat.js: en.isBoss?2.2:1),
+      // not a raw sprite-pixel scale — apply it on top of the entity's real
+      // game radius, same normalization every other setTransform call uses,
+      // so a dying boss ghost is ~2.2x a normal enemy ghost, not ~2.2x the
+      // sprite file's own oversized native pixel size.
+      const ghostDef=ENEMY_DEFS[evData.d]||BOSS_DEFS[evData.d];
+      const ghostRadius=(ghostDef?ghostDef.radius:12)*(evData.scale||1);
+      setTransform(inst,x,y,0,ghostRadius);
       setClass(inst,'state-death',true);
       setTimeout(cleanup,1200); // generous — longest death anim in the roster (worm scatter/necrotic dissolve) is ~1.0-1.1s
     };
