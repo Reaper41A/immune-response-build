@@ -59,26 +59,6 @@ const DEFAULT_SETTINGS={
   veins:true,              // pulsing capillary network under the arena
   trailLength:'long',      // 'short'|'long' — projectile motion-trail length (the one deliberate blur/streak)
 
-  // ---- animated SVG overlay (svgFX.js) ----
-  // Two independent gates, both tier-driven (see QUALITY_PRESETS) rather
-  // than a single on/off, because the DOM cost and the visual value of
-  // "entities" vs "background" are not the same:
-  //  - svgEntities: animated sprites for enemies/players/core/pickups/
-  //    turrets/hazards. This is the expensive one — DOM pooling scales with
-  //    live entity count, which spikes hardest in exactly the fights where
-  //    frame time is already tightest. It's also purely additive on top of
-  //    the canvas draw (render.js keeps drawing every entity regardless),
-  //    so turning it off is never a missing-entity bug, only a lost flourish.
-  //  - svgBackground: animated SVG replacements for vein/ambient-drift
-  //    canvas draws. Cheap (few static-ish elements), but reuses the same
-  //    backgroundFx philosophy as the canvas version: off until backgroundFx
-  //    itself is on.
-  // Both are computed from tier, not hand-set by the player — see
-  // svgTierFor()/applyPreset() below. They ride along with `preset` the
-  // same way every other quality flag does.
-  svgEntities:true,
-  svgBackground:true,
-
   // ---- UI / readability ----
   damageText:true,         // floating damage/heal/EP number popups
   calloutFeed:true,        // squad text callouts ("X was overwhelmed!", buy/perk confirmations)
@@ -107,36 +87,13 @@ const DEFAULT_SETTINGS={
      60fps. This is "the game looks like it's supposed to".
    - ULTRA: everything High has, plus native DPR uncapped (3, covers modern
      high-refresh phones/monitors), boosted particle density above baseline,
-     long trails, uncapped 120fps render loop for high-refresh displays.
-
-   SVG overlay tiering (svgEntities/svgBackground), decided alongside the
-   rest of the tier split rather than bolted on:
-   - LOW/MEDIUM: both off. Canvas-only. This is the same call already made
-     for backgroundFx/veins/destructionParticles at these tiers — hold the
-     line on the priciest visual layers so the low end stays fast — and
-     svgEntities is the most expensive item in the whole svgFX system (DOM
-     pooling cost scales with live enemy+player count, which peaks exactly
-     when frame time is already tightest, mid-fight). Turning it off is
-     never a missing-entity bug: render.js draws every entity on canvas
-     unconditionally regardless of this flag, so Low/Medium simply don't
-     get the extra animated layer on top — same entities, less flourish.
-   - HIGH: svgEntities on, svgBackground off. Entities are the higher-value
-     flourish (per-entity hit/crit/ability states, death animations) and
-     the one players actually look at in combat; ambient background drift
-     is the explicitly lower-priority, priciest-per-pixel item, so it stays
-     deferred at High the same way canvas backgroundFx's own comment
-     already treats it relative to veins.
-   - ULTRA: both on — this is the "everything" tier.
-   Both ride the tier, not a standalone player toggle, because they're a
-   graphics-budget decision like glowQuality/destructionParticles, not a
-   preference like tracer/controlScheme. */
+     long trails, uncapped 120fps render loop for high-refresh displays. */
 const QUALITY_PRESETS={
   low:{
     resScale:0.6, dprCap:1,   autoRes:true,  frameCap:30,
     particles:true, particleDensity:0.35, destructionParticles:false, glowQuality:'off',
     screenShake:false, hitFlash:true,
     backgroundFx:false, veins:false, trailLength:'short',
-    svgEntities:false, svgBackground:false,
     damageText:true, calloutFeed:true, rangeRing:true,
   },
   medium:{
@@ -144,7 +101,6 @@ const QUALITY_PRESETS={
     particles:true, particleDensity:0.7,  destructionParticles:false, glowQuality:'reduced',
     screenShake:true,  hitFlash:true,
     backgroundFx:false, veins:true,  trailLength:'short',
-    svgEntities:false, svgBackground:false,
     damageText:true, calloutFeed:true, rangeRing:true,
   },
   high:{
@@ -152,7 +108,6 @@ const QUALITY_PRESETS={
     particles:true, particleDensity:1,    destructionParticles:true,  glowQuality:'full',
     screenShake:true,  hitFlash:true,
     backgroundFx:true,  veins:true,  trailLength:'long',
-    svgEntities:true, svgBackground:false,
     damageText:true, calloutFeed:true, rangeRing:true,
   },
   ultra:{
@@ -160,7 +115,6 @@ const QUALITY_PRESETS={
     particles:true, particleDensity:1.4,  destructionParticles:true,  glowQuality:'full',
     screenShake:true,  hitFlash:true,
     backgroundFx:true,  veins:true,  trailLength:'long',
-    svgEntities:true, svgBackground:true,
     damageText:true, calloutFeed:true, rangeRing:true,
   },
 };
@@ -174,15 +128,6 @@ function loadSettings(){
   return s;
 }
 const Settings=loadSettings();
-// Tracks svgEntities/svgBackground across calls to onSettingsChanged so the
-// SvgFX pool teardown below only fires on an actual true->false transition,
-// not on every unrelated settings save while already parked on a tier that
-// has these off. Seeded from the loaded Settings (not undefined) so the
-// very first call after boot doesn't misread as a spurious transition —
-// though since SvgFX's pools start empty regardless, this mainly matters
-// for the intent being correct, not an observable bug either way.
-let _prevSvgEntities=Settings.svgEntities;
-let _prevSvgBackground=Settings.svgBackground;
 
 function saveSettings(){
   try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(Settings));}catch(_){}
@@ -215,21 +160,6 @@ function onSettingsChanged(skipRender){
   if(!Settings.autoRes)setRes(Settings.resScale);
   resize(); // re-applies dprCap immediately (core.js reads Settings.dprCap)
   applyControlScheme();
-  // svgEntities/svgBackground dropping to false needs an actual pool
-  // teardown, not just "stop syncing" — sync()'s gate stops FUTURE frames
-  // from updating, but any DOM wrappers already appended stay in #svgLayer
-  // forever otherwise. Tracked against the previous call's values (not
-  // just "is it currently false") so this only fires on the actual
-  // false-to-true... er, true-to-false transition edge, not on every
-  // unrelated settings save while parked on a tier that already has these
-  // off (e.g. toggling `tracer` on Low would otherwise call SvgFX.reset()
-  // every time, for no reason, since svgEntities is already false there).
-  if(typeof SvgFX!=='undefined'){
-    if(_prevSvgEntities&&!Settings.svgEntities){try{SvgFX.reset();}catch(_){}}
-    else if(_prevSvgBackground&&!Settings.svgBackground){try{SvgFX.resetBackground();}catch(_){}} // svgEntities transitioning off already resets background too (see SvgFX.reset), so this only needs to fire when entities are staying on
-    _prevSvgEntities=Settings.svgEntities;
-    _prevSvgBackground=Settings.svgBackground;
-  }
   if(!skipRender&&typeof renderSettingsScreen==='function'&&App.screen==='settings')renderSettingsScreen();
 }
 

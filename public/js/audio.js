@@ -55,6 +55,7 @@ const AudioSys={
       case'shot_blaster':this.tone(640,'triangle',0.07,0.07,900);break;
       case'shot_turret':this.tone(880,'triangle',0.05,0.04,600);break;
       case'hit':this.tone(rand(220,280),'square',0.04,0.04,140);break;
+      case'hurt':this.tone(160,'sawtooth',0.09,0.06,90);this.noise(0.07,0.04,500);break;
       case'crit':this.tone(520,'square',0.07,0.07,180);this.tone(760,'square',0.06,0.055,220,0.02);break;
       case'shield':this.tone(980,'sine',0.08,0.055,1180);break;
       case'kill':this.tone(rand(300,340),'triangle',0.1,0.07,90);this.noise(0.08,0.05,1600);break;
@@ -79,8 +80,6 @@ const AudioSys={
       case'ui':this.tone(600,'sine',0.05,0.04,700);break;
       case'draftOpen':this.tone(500,'sine',0.09,0.05,650);this.tone(750,'sine',0.09,0.05,900,0.09);break;
       case'pulse':this.tone(240,'sine',0.25,0.05,480);break;
-      case'bossWindup':this.tone(90,'sawtooth',0.5,0.06,140);break;
-      case'bossSlam':this.noise(0.35,0.22,350);this.tone(70,'sawtooth',0.4,0.16,45);break;
       case'cloak':this.tone(500,'sine',0.12,0.035,250);break;
       case'split':this.noise(0.1,0.06,800);break;
       case'error':this.tone(200,'square',0.12,0.06,150);break;

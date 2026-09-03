@@ -60,22 +60,15 @@ function drawBackground(hbBeat){
       b.beginPath();b.arc(x,y,r,0,Math.PI*2);b.fill();
     }
   }
-  ctx.drawImage(bgCache,0,0,VW,VH); // static gradient/speckle backdrop — never animated, no SVG equivalent needed, always drawn regardless of tier
-
-  // svgFX.js's syncBackground() is an SVG replacement for the three
-  // ANIMATED pieces below (veins/glow-wash/floating-cells/drifting-
-  // organisms) — gated by Settings.svgBackground (Ultra only, see
-  // settings.js QUALITY_PRESETS). useCanvasBackground() reads that same
-  // setting, so canvas and SVG can never both draw these at once.
-  const svgOwnsBackground=typeof SvgFX!=='undefined'&&!SvgFX.useCanvasBackground();
+  ctx.drawImage(bgCache,0,0,VW,VH);
 
   // Capillaries used to be baked into bgCache as static lines. Now drawn live
   // each frame so they can pulse with the Body's heartbeat (hbBeat, same
   // signal that scales the core in drawCore) — the whole arena reads as
   // living tissue instead of a painted backdrop.
-  if(Settings.veins&&!svgOwnsBackground)drawVeins(hbBeat||0); // settings gate: veins
+  if(Settings.veins)drawVeins(hbBeat||0); // settings gate: veins
 
-  if(Settings.backgroundFx&&!svgOwnsBackground){ // settings gate: backgroundFx — the player's own
+  if(Settings.backgroundFx){ // settings gate: backgroundFx — the player's own
     // choice is authoritative here. COMPACT/REDUCED no longer silently veto
     // this the way they used to: Low/Medium presets already set
     // backgroundFx:false themselves (see settings.js QUALITY_PRESETS), so a
@@ -205,7 +198,6 @@ function drawFloatingCells(){
    order so it sits above entities, same visual idea as a cloud shadow. */
 function drawDriftingOrganisms(dt){
   if(REDUCED||!Settings.backgroundFx)return; // settings gate: backgroundFx
-  if(typeof SvgFX!=='undefined'&&!SvgFX.useCanvasBackground())return; // SVG's syncBackground owns this at the tier where svgBackground is on — see drawBackground's own svgOwnsBackground note
   if(!driftOrganisms)driftOrganisms=[];
   // spawn a new one occasionally — COMPACT no longer blocks this; the
   // backgroundFx check above (and Low/Medium presets already setting it
@@ -275,31 +267,21 @@ function drawCore(view,hbBeat){
   const healthy={r:62,g:232,b:200},dying={r:122,g:44,b:66};
   const col={r:Math.round(lerp(dying.r,healthy.r,pc)),g:Math.round(lerp(dying.g,healthy.g,pc)),b:Math.round(lerp(dying.b,healthy.b,pc))};
   const pulse=1+hbBeat*0.03*pc;
-  // Same skip-body reasoning as drawEnemies/drawPlayers — body_core.svg's
-  // own syncCore() reproduces the same health-tissue color lerp from the
-  // same bodyHp/bodyHpMax ratio (verified: see svgFX.js syncCore), plus a
-  // sickness-texture overlay canvas doesn't have, so the filled circle +
-  // radial tick lines here are redundant once the sprite is up. BODY/HP
-  // text and the critical ring are NOT in body_core.svg (checked directly:
-  // no <text>/<tspan> in the file) so those stay canvas-only regardless.
-  const bodyDrawn=!(Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyCore&&SvgFX.hasReadyCore());
   ctx.save();
   ctx.translate(c.x,c.y);ctx.scale(pulse,pulse);
   const spr=glowSprite('#'+((1<<24)|(col.r<<16)|(col.g<<8)|col.b).toString(16).slice(1),Math.round(r*1.5));
-  blitGlow(spr,0,0,0.30+hbBeat*0.10); // glow halo: not reproduced by the sprite, always drawn
-  if(bodyDrawn){
-    ctx.fillStyle=`rgb(${col.r},${col.g},${col.b})`;
-    ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=2;ctx.stroke();
-    ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=3;
-    const tt=performance.now()/1000;
-    for(let i=0;i<5;i++){
-      const a=i/5*Math.PI*2+tt*0.1;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a)*r*0.15,Math.sin(a)*r*0.15);
-      ctx.lineTo(Math.cos(a+0.6)*r*0.7,Math.sin(a+0.6)*r*0.7);
-      ctx.stroke();
-    }
+  blitGlow(spr,0,0,0.30+hbBeat*0.10);
+  ctx.fillStyle=`rgb(${col.r},${col.g},${col.b})`;
+  ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=2;ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=3;
+  const tt=performance.now()/1000;
+  for(let i=0;i<5;i++){
+    const a=i/5*Math.PI*2+tt*0.1;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*r*0.15,Math.sin(a)*r*0.15);
+    ctx.lineTo(Math.cos(a+0.6)*r*0.7,Math.sin(a+0.6)*r*0.7);
+    ctx.stroke();
   }
   ctx.fillStyle='rgba(255,255,255,0.62)';
   ctx.font='bold 11px Cascadia Mono, Consolas, monospace';
@@ -521,8 +503,30 @@ function drawParticles(){
       ctx.beginPath();ctx.arc(pt.x,pt.y,pt.size*(1.05-a*0.65),0,Math.PI*2);ctx.stroke();
     }else if(pt.type==='glyph'){
       ctx.fillStyle=pt.color;
-      ctx.font='11px sans-serif';ctx.textAlign='center';
-      ctx.fillText('✚',pt.x,pt.y);
+      ctx.font=(pt.size?pt.size:11)+'px sans-serif';ctx.textAlign='center';
+      ctx.fillText(pt.sym||'✚',pt.x,pt.y);
+    }else if(pt.type==='spark'){
+      // Thin radial streak that shrinks toward its own tip as it flies —
+      // used for charge-up bursts (Overdrive) and puffs (Dash launch).
+      const ang=Math.atan2(pt.vy,pt.vx);
+      const len=pt.size*(0.4+a*0.8);
+      ctx.strokeStyle=pt.color;ctx.lineWidth=2*a+0.4;
+      ctx.beginPath();
+      ctx.moveTo(pt.x,pt.y);
+      ctx.lineTo(pt.x-Math.cos(ang)*len,pt.y-Math.sin(ang)*len);
+      ctx.stroke();
+    }else if(pt.type==='chevron'){
+      // Small ">" wedge that travels along its velocity vector — used for
+      // Taunt's inward "pulled toward the tank" read and for enemy speed-buff tags.
+      const ang=Math.atan2(pt.vy,pt.vx);
+      ctx.save();
+      ctx.translate(pt.x,pt.y);ctx.rotate(ang);
+      ctx.strokeStyle=pt.color;ctx.lineWidth=2;ctx.lineCap='round';
+      const r=pt.size;
+      ctx.beginPath();
+      ctx.moveTo(-r,-r*0.7);ctx.lineTo(r*0.3,0);ctx.lineTo(-r,r*0.7);
+      ctx.stroke();
+      ctx.restore();
     }else if(pt.type==='debris'){
       // Jagged irregular fragment (destruction particles, settings gate:
       // destructionParticles) — an angular polygon that spins as it flies,
@@ -552,12 +556,22 @@ function drawParticles(){
   ctx.globalAlpha=1;
 }
 function drawMotes(){
-  const spr=glowSprite('#3ee8c8',8);
+  const epSpr=glowSprite('#3ee8c8',8);
   for(const m of FX.motes){
     if(m.t<0)continue;
     const x=lerp(m.x,m.tx,m.t);
     const y=lerp(m.y,m.ty,m.t)-Math.sin(m.t*Math.PI)*40;
-    blitGlow(spr,x,y,(1-m.t*m.t)*0.7);
+    if(m.sym){
+      // Symbol motes (e.g. heal '+') — reuses the same arc-flight path as
+      // EP motes but renders as a glyph so the payload reads at a glance.
+      ctx.globalAlpha=(1-m.t*m.t)*0.85;
+      ctx.fillStyle=m.color||'#8fe36a';
+      ctx.font='12px sans-serif';ctx.textAlign='center';
+      ctx.fillText(m.sym,x,y);
+      ctx.globalAlpha=1;
+    }else{
+      blitGlow(epSpr,x,y,(1-m.t*m.t)*0.7);
+    }
   }
 }
 function drawPopups(){

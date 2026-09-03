@@ -238,7 +238,7 @@ function simUpdate(dt){
           at:{x:item.at.x+rand(-18,18),y:item.at.y+rand(-18,18),angle:item.at.angle},
         });
         SIM.enemies.push(en);
-        if(item.isBoss)ev({k:'bossSpawn',name:en.name});
+        if(item.isBoss)ev({k:'bossSpawn',x:en.x,y:en.y,name:en.name,color:en.color});
       }
       SIM.pendingSpawns.splice(i,1);
     }
@@ -260,6 +260,7 @@ function simUpdate(dt){
     if(p.abilityCd>0)p.abilityCd-=dt;
     if(p.abilityActive>0){p.abilityActive-=dt;if(p.abilityActive<=0)onAbilityEnd(p);}
     if(p.invuln>0)p.invuln-=dt;
+    if(p.hitFlash>0)p.hitFlash=Math.max(0,p.hitFlash-dt);
     if(p.isBot)updateBot(p,dt);else updateHumanPlayer(p,dt);
     tickPlayerPerks(p,dt);
   }

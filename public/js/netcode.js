@@ -35,6 +35,10 @@ function buildSnapshot(){
       am:p.ammo,amx:p.ammoMax,ht:r1(p.heat),oh:p.overheated?1:0,
       ac:r1(Math.max(0,p.abilityCd)),acd:CLASSES[p.cls].ability.cd,
       aa:r1(p.abilityActive),k:p.kills,lg:p.lockId||0,
+      sh:Math.round(p._healShield||0),
+      bl:p._bloodlustStacks||0,dc:p._dashCritWindow>0?1:0,da:p._dashApexWindow>0?1:0,
+      dm:p._dashMomentumStacks||0,ob:p._overhealDmgBuff>0?1:0,fc:p._followupCritWindow>0?1:0,
+      iv:p.invuln>0?1:0,hf:r1(p.hitFlash),
     })),
     enemies:s.enemies.map(e=>({
       i:e.id,d:e.defKey,x:r1(e.x),y:r1(e.y),hp:Math.round(e.hp),hm:Math.round(e.hpMax),
@@ -42,14 +46,7 @@ function buildSnapshot(){
       mg:e.defKey==='macrophageMimic'?(e.revealed?2:(e.revealT>0?3:1)):0,
       dp:e.disguisePid||0,rg:e.regenShimmer?1:0,cl:e.cloaked?1:0,
       lg:e.lungeT>0?1:0,seg:e.segments?1:0,
-      // See main.js buildHostView for what pt/pf/st/sf/ba mean — kept
-      // identical across both view-builders so guests get the same svgFX
-      // behavior as the host (guestBuildView spreads these through untouched).
-      pt:e.pulseCfg?r1(clamp(1-e.pulseT/e.pulseCfg.interval,0,1)):0,
-      pf:e._justPulsed>0?1:0,
-      st:e.slamCfg?(e.slamWindupT>0?r1(clamp(1-e.slamWindupT/e.slamCfg.windup,0,1)):0):0,
-      sf:e._justSlammed>0?1:0,
-      ba:e.buffAura?1:0,
+      bf:(e._buffed||e._buffPulseT>0)?1:0,
     })),
     projs:s.projectiles.map(p=>({x:r1(p.x),y:r1(p.y),c:p.color,tr:p.trail.map(t=>[r1(t.x),r1(t.y)]),sp:p.splash>0?1:0})),
     pickups:s.pickups.map(p=>({x:r1(p.x),y:r1(p.y),l:r1(p.life),w:r1(p.wobble)})),

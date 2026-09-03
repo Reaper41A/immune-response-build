@@ -26,6 +26,10 @@ function buildHostView(){
       am:p.ammo,amx:p.ammoMax,ht:r1(p.heat),oh:p.overheated?1:0,
       ac:Math.max(0,p.abilityCd),acd:CLASSES[p.cls].ability.cd,
       aa:p.abilityActive,k:p.kills,lg:p.lockId||0,
+      sh:Math.round(p._healShield||0),
+      bl:p._bloodlustStacks||0,dc:p._dashCritWindow>0?1:0,da:p._dashApexWindow>0?1:0,
+      dm:p._dashMomentumStacks||0,ob:p._overhealDmgBuff>0?1:0,fc:p._followupCritWindow>0?1:0,
+      iv:p.invuln>0?1:0,hf:p.hitFlash,
     })),
     enemies:s.enemies.map(e=>({
       i:e.id,d:e.defKey,x:e.x,y:e.y,hp:e.hp,hm:e.hpMax,
@@ -33,27 +37,7 @@ function buildHostView(){
       mg:e.defKey==='macrophageMimic'?(e.revealed?2:(e.revealT>0?3:1)):0,
       dp:e.disguisePid||0,rg:e.regenShimmer?1:0,cl:e.cloaked?1:0,
       lg:e.lungeT>0?1:0,seg:e.segments?1:0,
-      // Storm Cloud pulse telegraph: pt is 0→1 as the NEXT pulse approaches
-      // (1 = about to fire this instant), so the client can ramp a
-      // "charging" glow through the last portion of the interval rather
-      // than only reacting after the fact. pf is a short duration-based flag
-      // (en._justPulsed, set in enemies.js) rather than a single-tick edge —
-      // simUpdate can run several fixed steps per rendered frame, so an
-      // exact "just reset" check could be stepped past and missed.
-      pt:e.pulseCfg?clamp(1-e.pulseT/e.pulseCfg.interval,0,1):0,
-      pf:e._justPulsed>0?1:0,
-      // Boss slam telegraph: st ramps 0→1 as the windup approaches impact
-      // (1 = landing this instant) — mirrors pt's shape exactly, just keyed
-      // off slamWindupT/slam.windup instead of pulseT/pulse.interval, since
-      // the windup only exists as its own countdown once slamT has expired
-      // (see enemies.js updateEnemies — slamWindupT is 0 outside the
-      // telegraph phase, so st is correctly 0 the rest of the time too).
-      // sf is a short duration flag for "just landed", same reasoning as pf.
-      st:e.slamCfg?(e.slamWindupT>0?clamp(1-e.slamWindupT/e.slamCfg.windup,0,1):0):0,
-      sf:e._justSlammed>0?1:0,
-      // Parasite (and anything else with buffAura) buffs continuously while
-      // alive — no timer to expose, the flag itself IS the state.
-      ba:e.buffAura?1:0,
+      bf:(e._buffed||e._buffPulseT>0)?1:0,
     })),
     projs:s.projectiles.map(p=>({x:p.x,y:p.y,c:p.color,tr:p.trail.map(t=>[t.x,t.y]),sp:p.splash>0?1:0})),
     pickups:s.pickups.map(p=>({x:p.x,y:p.y,l:p.life,w:p.wobble})),
@@ -175,17 +159,6 @@ function render(view,dtReal){
     ctx.globalAlpha=1;
     ctx.globalCompositeOperation='source-over';
     ctx.shadowBlur=0;
-  }
-  // Animated-SVG overlay sync (svgFX.js) — additive, sits entirely outside
-  // the try/finally above since it never touches canvas state; a failure
-  // here must never leave ctx in a dirty state for next frame, and vice
-  // versa a canvas error must not skip the SVG layer's own cleanup.
-  // Called unconditionally (not gated on `view`) because the ambient
-  // background sync needs to keep running on the main menu too, matching
-  // drawBackground's own unconditional call in render() above — entity
-  // syncs internally no-op on a missing view (see sync()'s own view guard).
-  if(typeof SvgFX!=='undefined'){
-    try{SvgFX.sync(view,dtReal,hbBeat);}catch(err){console.error('SvgFX.sync error:',err);}
   }
   FX.shake=Math.max(0,FX.shake-dtReal*40);
 }
@@ -519,7 +492,7 @@ function wireUi(){
   $('btnReplayHints').addEventListener('click',resetHints);
   $('btnQuit').addEventListener('click',()=>{
     if(App.mode==='mp')leaveToMenu(); // leaveToMenu() exits fullscreen itself
-    else{exitGameFullscreen();App.inRun=false;SIM=null;if(typeof SvgFX!=='undefined')SvgFX.reset();showScreen('screenSplash');}
+    else{exitGameFullscreen();App.inRun=false;SIM=null;showScreen('screenSplash');}
   });
   $('btnSkipDraft').addEventListener('click',skipSquadDraft);
 

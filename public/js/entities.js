@@ -5,25 +5,10 @@
 
 function drawEnemies(view){
   const t=performance.now()/1000;
-  // svgEntities (High/Ultra) draws an animated sprite ON TOP of whatever
-  // this function draws for the same entity — so at those tiers the BODY
-  // shape drawn here is pure redundant fill-rate, paid every frame for
-  // every enemy, for pixels nothing ever sees (fully occluded by the SVG
-  // layer, which sizes/positions itself identically — see svgFX.js
-  // worldToScreen). skipBody below turns that body draw off while leaving
-  // every overlay (glow halo, hp bar, elite ring, taunt ring, boss label)
-  // drawing exactly as before — those are NOT reproduced by the sprites in
-  // svgFX.js's ENEMY_SPRITES map, so they must keep drawing regardless of
-  // tier. Only entities svgFX.js actually has a mapped sprite for AND has a
-  // ready pooled instance for get skipped — a still-loading or unmapped
-  // (boss/worm/mimic) entity always keeps its canvas body so nothing ever
-  // goes invisible for a frame while a sprite fetch is in flight.
-  const skipBody=Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyEnemy;
   for(const en of view.enemies||[]){
     const def=ENEMY_DEFS[en.d]||BOSS_DEFS[en.d]||{color:'#fff',glow:'#fff',radius:12,name:'?'};
-    const bodyDrawn=!(skipBody&&SvgFX.hasReadyEnemy(en));
     // worm body chain (position history is tracked per-frame in finalizeView)
-    if(en.wseg&&bodyDrawn){
+    if(en.wseg){
       for(let i=en.wseg.length-1;i>=1;i--){
         const s=en.wseg[i];
         const rr=Math.max(3,def.radius*(1-i*0.09));
@@ -35,7 +20,6 @@ function drawEnemies(view){
     }
     // Mimic in disguise renders as a PLAYER of its victim's color — that is
     // the entire point (Phase 1 ruling). Revealed form is a pale husk.
-    // Never sprite-backed (unmapped in ENEMY_SPRITES), so always drawn.
     if(en.mg===1&&en.dp){
       const victim=(view.players||[]).find(p=>p.i===en.dp);
       drawMimicDisguised(en,t,victim);
@@ -47,21 +31,11 @@ function drawEnemies(view){
     if(en.cl)alpha=0.35;
     if(en.mg===3)alpha=0.5+Math.abs(Math.sin(t*30))*0.4; // telegraph flicker
     const gr=en.hm>500?def.radius*2.6:def.radius*2.2;
-    blitGlow(glowSprite(def.glow,Math.ceil(gr)),0,0,alpha*0.32); // glow halo: not reproduced by the SVG sprite, always drawn
+    blitGlow(glowSprite(def.glow,Math.ceil(gr)),0,0,alpha*0.32);
     ctx.globalAlpha=alpha;
 
     const flash=en.tf>0?en.tf/0.15:0;
     ctx.fillStyle=flash>0?`rgba(255,255,255,${0.55+flash*0.45})`:def.color;
-    if(!bodyDrawn){
-      // sprite owns the body; overlays (elite ring/taunt/parasite aura in
-      // local coords, then hp bar/boss label in world coords) still need
-      // drawing — same two calls as the normal path below, just without
-      // the switch-statement shape draw in between.
-      drawEnemyLocalOverlays(en,def);
-      ctx.restore();
-      drawEnemyWorldOverlays(en,def);
-      continue;
-    }
     switch(en.d){
       case'bacteria':blobPath(def.radius,t*3.3+en.i);break;
       case'virus':spikyPath(def.radius,8,t*5+en.i);break;
@@ -119,46 +93,53 @@ function drawEnemies(view){
         shade3D(ctx,def.radius);
     }
 
-    // elite ring + glyph, taunt ring, parasite aura hint — local coords
-    drawEnemyLocalOverlays(en,def);
+    // elite ring + glyph
+    if(en.el){
+      const ec={armor:'#c9c9c9',speed:'#ffd166',shield:'#7fd6ff',regen:'#8fe36a'}[en.el]||'#fff';
+      ctx.strokeStyle=ec;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(0,0,def.radius+4,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle=ec;
+      ctx.font='bold 9px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
+      ctx.fillText({armor:'A',speed:'S',shield:'S+',regen:'R'}[en.el]||'',0,-def.radius-8);
+    }
+    // taunt ring
+    if(en.tb){ctx.strokeStyle='rgba(127,214,255,0.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,def.radius+7,0,Math.PI*2);ctx.stroke();}
+    // parasite aura tether hint
+    if(en.d==='parasite'){
+      ctx.strokeStyle='rgba(255,159,90,0.25)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(0,0,140,0,Math.PI*2);ctx.stroke();
+    }
+    // speed-buffed marker (Storm Cloud pulse / Parasite aura): rising
+    // chevrons above the body so a sudden burst of speed has an on-screen
+    // cause instead of the enemy just silently moving faster.
+    if(en.bf){
+      ctx.strokeStyle='rgba(255,159,90,0.85)';ctx.lineWidth=2;ctx.lineCap='round';
+      for(let i=0;i<2;i++){
+        const cy=-def.radius-10-((t*40+i*9)%18);
+        const ca=clamp(1-((t*40+i*9)%18)/18,0.15,1);
+        ctx.globalAlpha=ca;
+        ctx.beginPath();
+        ctx.moveTo(-5,cy+5);ctx.lineTo(0,cy);ctx.lineTo(5,cy+5);
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
     ctx.restore();
 
-    drawEnemyWorldOverlays(en,def);
-  }
-}
-function drawEnemyLocalOverlays(en,def){
-  // elite ring + glyph
-  if(en.el){
-    const ec={armor:'#c9c9c9',speed:'#ffd166',shield:'#7fd6ff',regen:'#8fe36a'}[en.el]||'#fff';
-    ctx.strokeStyle=ec;ctx.lineWidth=2.5;
-    ctx.beginPath();ctx.arc(0,0,def.radius+4,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle=ec;
-    ctx.font='bold 9px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
-    ctx.fillText({armor:'A',speed:'S',shield:'S+',regen:'R'}[en.el]||'',0,-def.radius-8);
-  }
-  // taunt ring
-  if(en.tb){ctx.strokeStyle='rgba(127,214,255,0.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,def.radius+7,0,Math.PI*2);ctx.stroke();}
-  // parasite aura tether hint
-  if(en.d==='parasite'){
-    ctx.strokeStyle='rgba(255,159,90,0.25)';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.arc(0,0,140,0,Math.PI*2);ctx.stroke();
-  }
-}
-function drawEnemyWorldOverlays(en,def){
-
-  // hp bar (tanky units only — trash dies fast enough not to need one)
-  if(!isBossDef(en.d)&&en.hm>40){
-    const w=en.hm>400?60:30;
-    const pct=clamp(en.hp/en.hm,0,1);
-    ctx.fillStyle='rgba(0,0,0,0.45)';
-    ctx.fillRect(en.x-w/2,en.y-def.radius-14,w,4);
-    ctx.fillStyle=pct>0.5?'#8fe36a':pct>0.25?'#ffd166':'#ff4d6d';
-    ctx.fillRect(en.x-w/2,en.y-def.radius-14,w*pct,4);
-  }
-  if(isBossDef(en.d)){
-    ctx.fillStyle='#ffb3c0';
-    ctx.font='bold 11px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
-    ctx.fillText(def.name.toUpperCase(),en.x,en.y-def.radius-16);
+    // hp bar (tanky units only — trash dies fast enough not to need one)
+    if(!isBossDef(en.d)&&en.hm>40){
+      const w=en.hm>400?60:30;
+      const pct=clamp(en.hp/en.hm,0,1);
+      ctx.fillStyle='rgba(0,0,0,0.45)';
+      ctx.fillRect(en.x-w/2,en.y-def.radius-14,w,4);
+      ctx.fillStyle=pct>0.5?'#8fe36a':pct>0.25?'#ffd166':'#ff4d6d';
+      ctx.fillRect(en.x-w/2,en.y-def.radius-14,w*pct,4);
+    }
+    if(isBossDef(en.d)){
+      ctx.fillStyle='#ffb3c0';
+      ctx.font='bold 11px Cascadia Mono, Consolas, monospace';ctx.textAlign='center';
+      ctx.fillText(def.name.toUpperCase(),en.x,en.y-def.radius-16);
+    }
   }
 }
 function isBossDef(d){return d==='megaVirus'||d==='mutatedFungus'||d==='parasiteQueen';}
@@ -259,14 +240,6 @@ function roundRect(x,y,w,h,r){
 const YOU_COLOR='#ff3ec8'; // Phase 3 audit fix — unique vs every class/enemy
 function drawPlayers(view,firingRingFor){
   const t=performance.now()/1000;
-  // Same reasoning as drawEnemies' skipBody: at High/Ultra the SVG sprite
-  // sits on top of the canvas body and fully occludes it, so once a
-  // player's sprite instance is ready, drawing the canvas body circle is
-  // pure redundant fill-rate. YOU-ring, overdrive-aura ring, facing nub,
-  // name/chevron, and mini-hp-bar are NOT reproduced by the sprite (each
-  // player sprite's ability-active state covers the ability moment, not
-  // these constant HUD-ish overlays) so those keep drawing unconditionally.
-  const skipBody=Settings.svgEntities&&typeof SvgFX!=='undefined'&&SvgFX.hasReadyPlayer;
   for(const p of view.players||[]){
     const cls=CLASSES[p.c]||CLASSES.tcell;
     if(!p.a){
@@ -313,39 +286,76 @@ function drawPlayers(view,firingRingFor){
     }
     ctx.save();
     ctx.translate(p.x,p.y);
-    const baseA=view.invulnHint===p.i?0.6+Math.sin(performance.now()/40)*0.3:1;
-    blitGlow(glowSprite(p.col,34),0,0,baseA*0.3); // glow halo: not reproduced by the sprite, always drawn
+    // Invulnerability flicker (Dash's invuln window, post-respawn grace,
+    // and revive grace) — p.iv was previously read from a field
+    // (view.invulnHint) that nothing ever set, so none of these windows had
+    // any visible tell before now.
+    const baseA=p.iv?0.6+Math.sin(performance.now()/40)*0.3:1;
+    blitGlow(glowSprite(p.col,34),0,0,baseA*0.3);
     ctx.globalAlpha=baseA;
 
-    // YOU ring — magenta, pulsing, ONLY on the local player. Not
-    // reproduced by any player sprite (it's a meta/HUD cue, not part of
-    // the character), so always drawn regardless of body skip.
+    // YOU ring — magenta, pulsing, ONLY on the local player
     if(p.i===App.myPid){
       ctx.strokeStyle='rgba(255,62,200,0.92)';
       ctx.lineWidth=2.5;
       const pulse=1+(REDUCED?0:Math.sin(t*4)*0.07);
       ctx.beginPath();ctx.arc(0,0,22*pulse,0,Math.PI*2);ctx.stroke();
     }
-    const bodyDrawn=!(skipBody&&SvgFX.hasReadyPlayer(p));
-    if(bodyDrawn){
-      ctx.fillStyle=p.col;
-      ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
-      shade3D(ctx,14,{hiAlpha:0.6});
-      ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':'rgba(255,255,255,0.65)';
-      ctx.lineWidth=1.5;ctx.stroke();
-      // facing nub
-      ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(0,0);
-      ctx.lineTo(Math.cos(p.f||0)*21,Math.sin(p.f||0)*21);ctx.stroke();
-    }
-    // overdrive aura — the sprite's own ability-active state covers the
-    // ability's INTERNAL animation (pseudopods/receptors/antibodies/dash
-    // streaks per-class), but none of the four sprites draw this specific
-    // ring, so it's kept as its own always-on layer rather than assumed
-    // covered by ability-active.
+    // Hit flash: a bright white tint that overrides the class color for a
+    // few frames on any damage taken — mirrors en.hitFlash on enemies.
+    // Previously a player being hit had NO visible change to their own
+    // sprite at all; only a throttled full-screen vignette for the local
+    // player, nothing for anyone watching an ally get hit.
+    const hitF=p.hf>0?p.hf/0.15:0;
+    ctx.fillStyle=hitF>0?`rgba(255,255,255,${0.55+hitF*0.45})`:p.col;
+    ctx.beginPath();ctx.arc(0,0,14,0,Math.PI*2);ctx.fill();
+    shade3D(ctx,14,{hiAlpha:0.6});
+    ctx.strokeStyle=p.oh?'rgba(255,77,109,0.95)':(hitF>0?'rgba(255,77,109,0.9)':'rgba(255,255,255,0.65)');
+    ctx.lineWidth=1.5;ctx.stroke();
+    // facing nub
+    ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(p.f||0)*21,Math.sin(p.f||0)*21);ctx.stroke();
+    // sustained per-ability aura: what's drawn here depends on which class's
+    // ability is currently active (p.aa is the shared "ability active" timer
+    // across all classes) — each class gets its own distinct sustained look
+    // rather than every ability reusing the same generic ring.
     if(p.aa>0){
-      ctx.strokeStyle='rgba(62,232,200,0.7)';ctx.lineWidth=2;
-      ctx.beginPath();ctx.arc(0,0,19+Math.sin(t*10)*2,0,Math.PI*2);ctx.stroke();
+      if(cls.ability.key==='overdrive'){
+        // T-Cell: tight, fast-pulsing ring — reads as "spinning up faster"
+        ctx.strokeStyle='rgba(62,232,200,0.7)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(0,0,19+Math.sin(t*10)*2,0,Math.PI*2);ctx.stroke();
+      }else if(cls.ability.key==='taunt'){
+        // Macrophage: wide, slow-pulsing ring with small chevrons orbiting
+        // inward around it — sustained "still pulling aggro" read, visually
+        // distinct from Overdrive's tight fast pulse.
+        ctx.strokeStyle='rgba(127,214,255,0.55)';ctx.lineWidth=2.5;
+        ctx.beginPath();ctx.arc(0,0,26+Math.sin(t*3)*2,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle='rgba(127,214,255,0.8)';ctx.lineWidth=1.5;
+        for(let i=0;i<3;i++){
+          const oa=t*2+i*(Math.PI*2/3);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(oa)*34,Math.sin(oa)*34);
+          ctx.lineTo(Math.cos(oa)*27,Math.sin(oa)*27);
+          ctx.stroke();
+        }
+      }else if(cls.ability.key==='dash'){
+        // NK Cell: brief shimmering double-outline (invuln window) instead
+        // of a ring — dash is over in a quarter-second so it reads as a
+        // flicker, not an aura you'd expect to sit and watch.
+        ctx.strokeStyle=`rgba(192,132,252,${0.5+Math.sin(t*30)*0.3})`;ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.stroke();
+      }
+    }
+    // Heal Shield (perk-granted absorb from B-cell Heal Burst): a segmented
+    // hex-ish outline that visibly sits on the shielded player independent
+    // of whose ability is active, so "why am I not taking full damage" has
+    // an on-screen answer instead of silently reduced numbers.
+    if(p.sh>0){
+      ctx.strokeStyle='rgba(255,209,102,0.85)';ctx.lineWidth=2;
+      ctx.setLineDash([4,3]);
+      ctx.beginPath();ctx.arc(0,0,24,t*1.5,t*1.5+Math.PI*2*clamp(p.sh/40,0.25,1));ctx.stroke();
+      ctx.setLineDash([]);
     }
     ctx.restore();
 
@@ -367,6 +377,42 @@ function drawPlayers(view,firingRingFor){
     const pct=clamp(p.hp/p.hm,0,1);
     ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(p.x-14,p.y-24,28,3);
     ctx.fillStyle=pct>0.35?p.col:'#ff4d6d';ctx.fillRect(p.x-14,p.y-24,28*pct,3);
+    // Active timed-buff icon row: several perks grant short damage/crit/speed
+    // windows (Bloodlust stacks, post-Dash crit windows, Building Momentum
+    // stacks, Antibody Surplus, Follow-Up Strike) that previously had zero
+    // client-side indication they were running. One small icon per active
+    // buff, drawn under the nameplate, keeps all of them visible without
+    // needing a bespoke aura per perk.
+    const buffIcons=[];
+    if(p.bl>0)buffIcons.push({sym:'🩸',n:p.bl});
+    if(p.dc)buffIcons.push({sym:'💨'});
+    if(p.da)buffIcons.push({sym:'👑'});
+    if(p.dm>0)buffIcons.push({sym:'💨',n:p.dm,tint:true});
+    if(p.ob)buffIcons.push({sym:'💫'});
+    if(p.fc)buffIcons.push({sym:'🗡️'});
+    if(buffIcons.length){
+      const iw=13,total=buffIcons.length*iw;
+      let bx=p.x-total/2+iw/2;
+      const by=p.y+38;
+      for(const b of buffIcons){
+        ctx.save();
+        ctx.translate(bx,by);
+        ctx.globalAlpha=0.55+Math.sin(t*6)*0.15;
+        ctx.beginPath();ctx.arc(0,0,7,0,Math.PI*2);
+        ctx.fillStyle='rgba(10,14,20,0.55)';ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.stroke();
+        ctx.globalAlpha=1;
+        ctx.font='8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(b.sym,0,0.5);
+        if(b.n>1){
+          ctx.fillStyle='#fff';ctx.font='bold 7px Cascadia Mono, Consolas, monospace';
+          ctx.fillText('x'+b.n,0,7);
+        }
+        ctx.textBaseline='alphabetic';
+        ctx.restore();
+        bx+=iw;
+      }
+    }
     // target reticle on this player's lock (host view only)
     if(view.lockOf&&view.lockOf[p.i]){
       const en=view.enemies.find(e=>e.i===view.lockOf[p.i]);

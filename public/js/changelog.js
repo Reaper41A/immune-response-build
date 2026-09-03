@@ -60,6 +60,47 @@
 
 const CHANGELOG=[
   {
+    version:'1.6.2',
+    date:'2026-09-03',
+    title:'Damage Feedback Overhaul',
+    sections:{
+      added:[
+        'Getting hit by an enemy now has an actual visible impact: a spark burst and a floating damage number at the point of contact, and a white hit-flash on your own cell — previously an enemy walking into you (or an ally) produced no visible effect at all beyond a throttled screen-edge flash only the victim could see.',
+        'A dedicated low-HP warning: your screen edge pulses red once your own HP drops below 30%, separate from (and in addition to) the existing low-Body-HP warning.',
+        'Invulnerability windows (post-Dash, post-respawn, and ally-revive grace) now flicker your cell visibly — this hookup existed in the code but was never actually connected to anything, so all three were silently invisible before.',
+        'Retrovirus cloaking now has a visual: a glitch-particle burst plays when it cloaks and when it decloaks, matching its bestiary tell ("track the faint shimmer") which previously had nothing behind it.',
+        'A boss spawning now gets a shockwave burst and camera shake at its actual spawn point, on top of the existing name-detected banner.',
+        'Several perks that grant short, stacking, or timed combat buffs \u2014 Bloodlust Cascade, Ambush Predator, Phantom Predator, Building Momentum, Antibody Surplus, and Follow-Up Strike \u2014 now show a small icon under the affected player while active. All six were fully functional but had zero client-side indication they were running.'
+      ],
+      changed:[],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'The full-screen red/green flash vignettes for taking damage and being healed (Settings > hitFlash) were tracked internally and decayed every frame but were never actually applied to the screen \u2014 the DOM elements and CSS existed but nothing wrote to them. They now work as intended.'
+      ]
+    }
+  },
+  {
+    version:'1.6.1',
+    date:'2026-09-03',
+    title:'Ability & Effect Visibility Pass',
+    sections:{
+      added:[
+        'Every class ability now gets its own distinct activation effect instead of a generic ring: Heal Burst sends a burst of outward healing motes plus a \'+\' that visibly travels from the B-Cell to each ally it actually reaches; Overdrive gets a fast charging double-ring with radiating sparks; Taunt gets an outward shockwave with small chevrons pulled back in toward the Macrophage; Dash now kicks out a puff of speed-line debris at the launch point instead of being silent.',
+        'Active abilities now show a sustained visual for their full duration, styled per class \u2014 Overdrive\u2019s tight fast-pulsing ring, Taunt\u2019s wide slow ring with orbiting chevrons, and Dash\u2019s brief shimmering outline during its invulnerability window \u2014 instead of every class reusing the same Overdrive-styled ring.',
+        'B-Cell shield perks (Guardian Membrane / Reactive Ward evolutions) now render a visible depleting shield outline on the protected player, so damage reduction from an active shield has an on-screen source instead of just quietly reducing incoming numbers.',
+        'Enemies sped up by Cytokine Storm Cloud\u2019s pulse or a Parasite\u2019s aura now show small rising chevrons above their body while buffed, so a sudden burst of enemy speed has a visible cause.'
+      ],
+      changed:[],
+      nerfs:[],
+      buffs:[],
+      fixed:[
+        'Heal Burst previously played a text popup and sound with no burst effect at the caster and no indication of who was actually healed \u2014 it now has a full activation burst plus per-ally travel motes.',
+        'Every player ability\u2019s sustained "active" visual was hardcoded to Overdrive\u2019s teal ring regardless of which class or ability was actually active \u2014 Taunt and Dash now get their own correct sustained look.'
+      ]
+    }
+  },
+  {
     version:'1.6.0',
     date:'2026-08-31',
     title:'Cursed Cards & Full Card Rotation',

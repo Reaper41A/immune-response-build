@@ -354,7 +354,6 @@ function applyGuestAction(pid,d){
 function showResults(stats,reason){
   if(App.screen==='results')return; // host event + relay can both arrive
   App.inRun=false;
-  if(typeof SvgFX!=='undefined')SvgFX.reset(); // clear pooled sprite DOM nodes now that the run is over
   showScreen('screenResults');
   $('resultsTitle').textContent='THE BODY HAS FALLEN';
   $('resultsSub').textContent='Failed at wave '+stats.waves+' — infection overwhelmed the body';
@@ -376,7 +375,6 @@ function leaveToMenu(){
   exitGameFullscreen(); // covers every path here: quit, kick, disconnect, host-ended
   App.leaving=true; // suppress auto-reconnect — this exit was intentional
   App.inRun=false;App.mode=null;App.isHost=false;SIM=null;
-  if(typeof SvgFX!=='undefined')SvgFX.reset(); // clear pooled sprite DOM nodes so a fresh run starts with an empty layer
   clearSquadIdentity();
   try{if(App.ws)App.ws.close();}catch(_){}
   App.ws=null;App.connected=false;

@@ -126,7 +126,7 @@ function killEnemy(en,opts={}){
     if(sh._odChainPerk&&sh.abilityActive>0)sh.abilityCd=Math.max(0,sh.abilityCd-CLASSES[sh.cls].ability.cd*0.15);
     if(sh._odExtendPerk&&sh.abilityActive>0&&CLASSES[sh.cls].ability.key==='overdrive')sh.abilityActive+=0.4;
   }
-  ev({k:'die',x:en.x,y:en.y,color:en.color,scale:en.isBoss?2.2:1,boss:en.isBoss,ep:gained,name:en.name,d:en.defKey});
+  ev({k:'die',x:en.x,y:en.y,color:en.color,scale:en.isBoss?2.2:1,boss:en.isBoss,ep:gained,name:en.name});
   trySpawnPickup(en);
   if(en.defKey==='fungi'&&mutFlags(SIM.wave).fungiSpores){for(let i=0;i<2;i++)spawnSpore(en);}
   if(en.defKey==='mycovirus')spawnSpore(en);
@@ -214,7 +214,8 @@ function damagePlayer(p,amount,src){
     onFireReleased(p);
     ev({k:'down',x:p.x,y:p.y,color:p.color,pid:p.pid,name:p.name});
   }else{
-    ev({k:'hurt',x:p.x,y:p.y,pid:p.pid,amt:Math.round(amount)});
+    p.hitFlash=0.15;
+    ev({k:'hurt',x:p.x,y:p.y,pid:p.pid,name:p.name,color:p.color,amt:Math.round(amount)});
   }
 }
 
@@ -245,11 +246,11 @@ function useAbility(p){
     // bigger taunted-target damage — so it deliberately does NOT set
     // p._tauntShield even though it shares the shield-granting perk check.
     if((p._tauntShieldPerk||p._tauntApexPerk)&&!p._tauntProvokeCurse)p._tauntShield=true;
-    ev({k:'taunt',x:p.x,y:p.y});
+    ev({k:'taunt',x:p.x,y:p.y,color:p.color});
   }else if(ab.key==='overdrive'){
     if(p._odDmgPerk)p._overdriveDmg=true;
     if(p._heatVentPerk||p._odInstantVentPerk){p.heat=0;p.overheated=false;p.overheatTimer=0;}
-    ev({k:'overdrive',x:p.x,y:p.y});
+    ev({k:'overdrive',x:p.x,y:p.y,color:p.color});
   }else if(ab.key==='heal'){
     // Metabolic Burnout (curse): every Heal Burst costs the caster 5% of
     // their own max HP — charged BEFORE the heal amounts below so a caster
@@ -266,6 +267,7 @@ function useAbility(p){
     SIM.bodyHp=Math.min(SIM.bodyHpMax,SIM.bodyHp+amt);
     const healedBody=Math.round(SIM.bodyHp-before);
     const healedPlayers=[];
+    const healTargets=[]; // {x,y,pid} of everyone the burst actually reached — drives the outward heal-mote FX
     // Miracle Cascade (legendary): also revive one downed ally at half HP.
     // Selfless Cascade (legendary personal perk): same, but keyed off the perk.
     if(p._healApexPerk||p._martyrPerk){
@@ -286,6 +288,7 @@ function useAbility(p){
         // Antibody Surplus (epic): heal that would've overflowed max HP
         // becomes a temporary squad damage buff instead of being wasted.
         if(p._overhealPerk&&pAmt>room)pl._overhealDmgBuff=6;
+        healTargets.push({x:pl.x,y:pl.y,pid:pl.pid});
         if(h>0)healedPlayers.push(pl.pid===App.myPid?'you':pl.name);
       }
     }
@@ -293,7 +296,7 @@ function useAbility(p){
       const k=Object.keys(SIM.debuffs).find(k=>SIM.debuffs[k]);
       if(k){SIM.debuffs[k]=false;SIM.organs[k]=Math.max(SIM.organs[k],30);ev({k:'organ',key:k});}
     }
-    ev({k:'heal',x:p.x,y:p.y,body:healedBody,players:healedPlayers});
+    ev({k:'heal',x:p.x,y:p.y,body:healedBody,players:healedPlayers,targets:healTargets,color:p.color});
   }else if(ab.key==='dash'){
     const a=p.facing;
     const dashSpeed=720*(p._dashSpeedMult||1);
@@ -316,7 +319,7 @@ function useAbility(p){
       if(cur<3){p.speed*=1.04;p._dashMomentumStacks=cur+1;}
       p._dashMomentumTimer=3;
     }
-    ev({k:'dash',x:p.x,y:p.y});
+    ev({k:'dash',x:p.x,y:p.y,a,color:p.color});
   }
 }
 function onAbilityEnd(p){

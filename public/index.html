@@ -84,9 +84,6 @@ html,body{height:100vh;height:100svh;height:100dvh;}
 #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
   width:100vw;height:100vh;height:100svh;height:100dvh;}
 #gameWrap{position:relative;width:100%;height:100%;max-width:2400px;max-height:1400px;}
-#svgLayer{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;}
-#svgLayer .svgSprite{position:absolute;left:0;top:0;pointer-events:none;transform-origin:0 0;will-change:transform;}
-#svgLayer .svgSprite svg{display:block;overflow:visible;}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 
 /* ======================================================================
@@ -733,6 +730,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #vignetteHurt{box-shadow:inset 0 0 120px 30px rgba(255,77,109,.55);}
 #vignetteLow{box-shadow:inset 0 0 160px 60px rgba(255,77,109,.4);}
 #vignetteHeal{box-shadow:inset 0 0 120px 30px rgba(143,227,106,.5);}
+#vignetteLowHp{box-shadow:inset 0 0 140px 50px rgba(255,77,109,.5);}
+#vignetteLowHp.pulsing{animation:lowHpPulse 1.1s ease-in-out infinite;}
+@keyframes lowHpPulse{0%,100%{opacity:var(--lowhp-op,0)}50%{opacity:calc(var(--lowhp-op,0)*0.4)}}
 
 /* tutorial hint chips */
 #hintLayer{position:absolute;bottom:calc(23vh + 4vmin + env(safe-area-inset-bottom));left:0;right:0;z-index:26;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;}
@@ -1160,19 +1160,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <div id="gameWrap">
   <canvas id="gameCanvas"></canvas>
 
-  <!-- SVG animation overlay: pooled, positioned DOM sprites synced every
-       frame to sim/view state by svgFX.js. Sits above the canvas (so
-       animated entities render over the painted background/trails/hazards)
-       and below the vignettes (so full-screen hurt/heal/low-hp flashes
-       still read on top of everything, matching the old canvas-only
-       behavior). pointer-events:none throughout — this layer is purely
-       visual and must never intercept input the canvas/HUD relies on. -->
-  <div id="svgLayer" aria-hidden="true"></div>
-
   <!-- vignettes -->
   <div class="vignette" id="vignetteHurt"></div>
   <div class="vignette" id="vignetteLow"></div>
   <div class="vignette" id="vignetteHeal"></div>
+  <div class="vignette" id="vignetteLowHp"></div>
 
   <!-- ============================ HUD ============================ -->
   <div id="hud">
@@ -1499,7 +1491,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <script src="js/enemies.js"></script>
 <script src="js/netcode.js"></script>
 <script src="js/fx.js"></script>
-<script src="js/svgFX.js"></script>
 <script src="js/render.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/bestiary.js"></script>

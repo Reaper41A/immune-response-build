@@ -38,14 +38,6 @@ function updateEnemies(dt){
       en.pulseT-=dt;
       if(en.pulseT<=0){
         en.pulseT=en.pulseCfg.interval;
-        // Duration-based flag (not a single-tick edge) so the SVG overlay
-        // can reliably observe "a pulse just fired" even though simUpdate
-        // can run several fixed steps per rendered frame (see main.js loop:
-        // up to 6 catch-up ticks between view builds) — an exact "pulseT
-        // just reset" check could get stepped past and missed entirely on a
-        // slow frame. .35s comfortably covers the pulsing CSS animation's
-        // .65s window being triggered at least once from any render cadence.
-        en._justPulsed=0.35;
         ev({k:'pulse',x:en.x,y:en.y,r:en.pulseCfg.radius});
         for(const other of SIM.enemies){
           if(other===en||!other.alive)continue;
@@ -54,44 +46,18 @@ function updateEnemies(dt){
       }
     }
     if(en._buffPulseT>0)en._buffPulseT-=dt;
-    if(en._justPulsed>0)en._justPulsed-=dt;
-
-    // Boss slam: periodic telegraphed AoE, two-phase like a state machine
-    // rather than two independently-ticking timers (which would double-tick
-    // once both were active). slamWindupT>0 means "currently telegraphing,
-    // counting down to impact"; slamWindupT===0 with slamCfg present means
-    // "counting down slamT to the NEXT windup's start". Only one of the two
-    // timers is ever live at once.
-    if(en.slamCfg){
-      if(en.slamWindupT>0){
-        en.slamWindupT=Math.max(0,en.slamWindupT-dt);
-        if(en.slamWindupT===0){
-          // windup complete: the slam actually lands now.
-          ev({k:'slam',x:en.x,y:en.y,r:en.slamCfg.radius});
-          for(const p of SIM.players){
-            if(!p.alive)continue;
-            if(dist2(en.x,en.y,p.x,p.y)<en.slamCfg.radius*en.slamCfg.radius){
-              damagePlayer(p,en.slamCfg.dmg,'bossSlam');
-            }
-          }
-          en._justSlammed=0.35; // short duration flag, same reasoning as _justPulsed above
-          en.slamT=en.slamCfg.interval;
-        }
-      }else{
-        en.slamT-=dt;
-        if(en.slamT<=0){
-          en.slamWindupT=en.slamCfg.windup; // enter telegraph phase
-          ev({k:'slamWindup',x:en.x,y:en.y,r:en.slamCfg.radius,windup:en.slamCfg.windup});
-        }
-      }
-    }
-    if(en._justSlammed>0)en._justSlammed-=dt;
 
     // Retrovirus cloak cycle.
     if(en.cloakCfg){
       en.cloakT-=dt;
-      if(en.cloakT<=0){en.cloakT=en.cloakCfg.interval;en.cloaked=true;en.cloakLeft=en.cloakCfg.duration;}
-      if(en.cloaked){en.cloakLeft-=dt;if(en.cloakLeft<=0)en.cloaked=false;}
+      if(en.cloakT<=0){
+        en.cloakT=en.cloakCfg.interval;en.cloaked=true;en.cloakLeft=en.cloakCfg.duration;
+        ev({k:'cloak',x:en.x,y:en.y,on:true});
+      }
+      if(en.cloaked){
+        en.cloakLeft-=dt;
+        if(en.cloakLeft<=0){en.cloaked=false;ev({k:'cloak',x:en.x,y:en.y,on:false});}
+      }
     }
 
     // Necrotic Drifter trail laying.

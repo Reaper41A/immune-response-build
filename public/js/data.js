@@ -85,18 +85,9 @@ const ENEMY_DEFS={
     tell:'Harmless until it matures into a bacterium.'},
 };
 const BOSS_DEFS={
-  // slam: a periodic telegraphed AoE — `windup` is the wind-up duration (the
-  // "about to hit" window the client ramps a charging animation through,
-  // same shape as cytokineStormCloud's existing pulse telegraph), `interval`
-  // is time between slams, `radius`/`dmg` define the hit itself. Routes
-  // through damagePlayer (see updateEnemies) so invuln/shields/damage
-  // reduction all still apply — it is a real attack, not raw HP subtraction.
-  megaVirus:{name:'Mega Virus',hp:1400,speed:38,dmg:150,radius:46,color:'#ff4d6d',glow:'#ffb3c0',ep:200,
-    slam:{windup:1.1,interval:5,radius:120,dmg:70}},
-  mutatedFungus:{name:'Mutated Fungus',hp:2000,speed:26,dmg:150,radius:52,color:'#6fae5f',glow:'#d7f5c9',ep:260,
-    slam:{windup:1.3,interval:6,radius:135,dmg:85}},
-  parasiteQueen:{name:'Parasite Queen',hp:2600,speed:30,dmg:150,radius:50,color:'#ff9f5a',glow:'#ffe0bd',ep:320,
-    slam:{windup:1.2,interval:5.5,radius:125,dmg:78}},
+  megaVirus:{name:'Mega Virus',hp:1400,speed:38,dmg:150,radius:46,color:'#ff4d6d',glow:'#ffb3c0',ep:200},
+  mutatedFungus:{name:'Mutated Fungus',hp:2000,speed:26,dmg:150,radius:52,color:'#6fae5f',glow:'#d7f5c9',ep:260},
+  parasiteQueen:{name:'Parasite Queen',hp:2600,speed:30,dmg:150,radius:50,color:'#ff9f5a',glow:'#ffe0bd',ep:320},
 };
 
 /* Continuous per-wave scaling (wave-config.json "scaling"). Boss curve is
